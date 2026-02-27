@@ -1,0 +1,17 @@
+services:
+  - type: worker
+    name: polsia-worker
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: npm run worker:start
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: BRAVE_SEARCH_API_KEY
+        sync: false
+      - key: NODE_ENV
+        value: production
