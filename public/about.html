@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About — Runloop</title>
+    <meta name="description" content="We're building the autonomous future. Every founder deserves a full team. Runloop gives you one.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{--bg:#08090d;--surface:#0f1117;--surface-2:#151821;--border:#1a1d27;--border-light:#252838;--text:#e8e9ed;--text-dim:#7a7f8e;--text-muted:#4a4f5e;--accent:#00e599;--accent-dim:rgba(0,229,153,0.12);--accent-glow:rgba(0,229,153,0.25);--warm:#ff6b4a;--purple:#8b5cf6;--blue:#6366f1;--amber:#f59e0b;--red:#ef4444;--cyan:#06b6d4}
+        body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
+        body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0}
+        .container{max-width:1100px;margin:0 auto;padding:0 24px;position:relative;z-index:1}
+        a{color:inherit;text-decoration:none}
+
+        /* NAV */
+        nav{padding:20px 0;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;background:rgba(8,9,13,0.85);backdrop-filter:blur(20px);border-bottom:1px solid transparent}
+        nav.scrolled{border-bottom-color:var(--border)}
+        .logo{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:22px;letter-spacing:-0.5px;display:flex;align-items:center;gap:10px}
+        .logo-mark{width:32px;height:32px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center}
+        .logo-mark svg{width:18px;height:18px}
+        .nav-links{display:flex;align-items:center;gap:32px}
+        .nav-links a{font-size:14px;color:var(--text-dim);transition:color 0.2s}
+        .nav-links a:hover{color:var(--text)}
+        .nav-links a.active{color:var(--accent)}
+        .nav-cta{display:flex;gap:12px;align-items:center}
+        .btn-ghost{padding:8px 16px;border-radius:8px;font-size:14px;font-weight:500;color:var(--text-dim);transition:all 0.2s}
+        .btn-ghost:hover{color:var(--text);background:var(--surface)}
+        .btn-primary{padding:8px 20px;border-radius:8px;font-size:14px;font-weight:600;background:var(--accent);color:#08090d;transition:all 0.2s;border:none;cursor:pointer;display:inline-block}
+        .btn-primary:hover{opacity:0.9;transform:translateY(-1px);box-shadow:0 4px 20px var(--accent-glow)}
+        .btn-primary-lg{padding:14px 32px;font-size:16px;border-radius:10px}
+        .hamburger{display:none;flex-direction:column;gap:5px;cursor:pointer;padding:8px}
+        .hamburger span{width:22px;height:2px;background:var(--text);transition:all 0.3s}
+        .mobile-menu{display:none;position:fixed;top:73px;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--border);padding:24px;z-index:99;flex-direction:column;gap:16px}
+        .mobile-menu.open{display:flex}
+        .mobile-menu a{font-size:16px;padding:12px 0;color:var(--text-dim);border-bottom:1px solid var(--border)}
+
+        /* HERO */
+        .about-hero{padding:120px 0 80px;text-align:center;position:relative}
+        .about-hero::before{content:'';position:absolute;top:-120px;left:50%;transform:translateX(-50%);width:900px;height:900px;background:radial-gradient(circle,rgba(139,92,246,0.15) 0%,transparent 60%);pointer-events:none}
+        .about-hero::after{content:'';position:absolute;top:-60px;right:20%;width:500px;height:500px;background:radial-gradient(circle,var(--accent-glow) 0%,transparent 70%);opacity:0.1;pointer-events:none}
+        .section-label{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:2px;color:var(--accent);margin-bottom:16px}
+        .about-hero h1{font-family:'Space Grotesk',sans-serif;font-size:clamp(2.5rem,6vw,4rem);font-weight:700;letter-spacing:-2px;line-height:1.1;margin-bottom:24px;max-width:700px;margin-left:auto;margin-right:auto}
+        .about-hero h1 .gradient{background:linear-gradient(135deg,var(--accent),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+        .about-hero p{font-size:clamp(1rem,2vw,1.2rem);color:var(--text-dim);max-width:580px;margin:0 auto;line-height:1.8}
+
+        /* MISSION */
+        .mission{padding:80px 0;position:relative}
+        .mission::before{content:'';position:absolute;left:0;right:0;top:0;height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent)}
+        .mission-grid{display:grid;grid-template-columns:1fr 1.2fr;gap:64px;align-items:center}
+        .mission-label{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:2px;color:var(--accent);margin-bottom:12px}
+        .mission h2{font-family:'Space Grotesk',sans-serif;font-size:clamp(1.6rem,3vw,2.2rem);font-weight:700;letter-spacing:-0.5px;margin-bottom:20px;line-height:1.2}
+        .mission p{color:var(--text-dim);font-size:1rem;line-height:1.8;margin-bottom:16px}
+        .mission-visual{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:40px;position:relative;overflow:hidden}
+        .mission-visual::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--purple),var(--blue))}
+        .mission-stat{margin-bottom:28px}
+        .mission-stat:last-child{margin-bottom:0}
+        .mission-stat-value{font-family:'Space Grotesk',sans-serif;font-size:2.8rem;font-weight:700;margin-bottom:4px;line-height:1}
+        .mission-stat-value.green{color:var(--accent)}
+        .mission-stat-value.purple{color:var(--purple)}
+        .mission-stat-value.blue{color:var(--blue)}
+        .mission-stat-label{font-size:14px;color:var(--text-dim)}
+
+        /* DIFFERENTIATORS */
+        .differentiators{padding:80px 0;position:relative}
+        .differentiators::before{content:'';position:absolute;left:0;right:0;top:0;height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent)}
+        .diff-header{text-align:center;margin-bottom:48px}
+        .diff-header h2{font-family:'Space Grotesk',sans-serif;font-size:clamp(1.6rem,3vw,2.4rem);font-weight:700;letter-spacing:-0.5px;margin-bottom:12px}
+        .diff-header p{color:var(--text-dim);font-size:1.05rem;max-width:520px;margin:0 auto}
+        .diff-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+        .diff-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:36px 28px;transition:all 0.3s;position:relative;overflow:hidden}
+        .diff-card:hover{border-color:var(--border-light);transform:translateY(-4px);box-shadow:0 12px 40px rgba(0,0,0,0.3)}
+        .diff-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:20px 20px 0 0}
+        .diff-card:nth-child(1)::before{background:var(--accent)}
+        .diff-card:nth-child(2)::before{background:var(--purple)}
+        .diff-card:nth-child(3)::before{background:var(--blue)}
+        .diff-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:20px;font-size:24px}
+        .diff-card:nth-child(1) .diff-icon{background:var(--accent-dim)}
+        .diff-card:nth-child(2) .diff-icon{background:rgba(139,92,246,0.12)}
+        .diff-card:nth-child(3) .diff-icon{background:rgba(99,102,241,0.12)}
+        .diff-card h3{font-family:'Space Grotesk',sans-serif;font-size:1.15rem;font-weight:600;margin-bottom:10px}
+        .diff-card p{color:var(--text-dim);font-size:0.95rem;line-height:1.7}
+
+        /* TEAM */
+        .team{padding:80px 0;position:relative}
+        .team::before{content:'';position:absolute;left:0;right:0;top:0;height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent)}
+        .team-content{text-align:center;max-width:640px;margin:0 auto}
+        .team h2{font-family:'Space Grotesk',sans-serif;font-size:clamp(1.6rem,3vw,2.2rem);font-weight:700;letter-spacing:-0.5px;margin-bottom:16px}
+        .team p{color:var(--text-dim);font-size:1.05rem;line-height:1.8;margin-bottom:20px}
+        .team-avatars{display:flex;justify-content:center;gap:0;margin-top:32px;margin-bottom:16px}
+        .team-avatar{width:52px;height:52px;border-radius:50%;border:3px solid var(--bg);margin-left:-12px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;font-family:'Space Grotesk',sans-serif;color:#fff}
+        .team-avatar:first-child{margin-left:0}
+        .team-avatar:nth-child(1){background:linear-gradient(135deg,var(--accent),#00b377)}
+        .team-avatar:nth-child(2){background:linear-gradient(135deg,var(--purple),#6d28d9)}
+        .team-avatar:nth-child(3){background:linear-gradient(135deg,var(--blue),#4338ca)}
+        .team-avatar:nth-child(4){background:linear-gradient(135deg,var(--warm),#dc2626)}
+        .team-avatar:nth-child(5){background:linear-gradient(135deg,var(--amber),#d97706)}
+        .team-tagline{color:var(--text-muted);font-size:14px;font-style:italic}
+        .team-values{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:40px;text-align:center}
+        .team-value{padding:20px;background:var(--surface);border:1px solid var(--border);border-radius:12px}
+        .team-value h4{font-family:'Space Grotesk',sans-serif;font-size:0.95rem;font-weight:600;margin-bottom:4px}
+        .team-value p{font-size:13px;color:var(--text-dim)}
+
+        /* CTA */
+        .cta{padding:80px 0}
+        .cta-box{background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:64px 40px;text-align:center;position:relative;overflow:hidden}
+        .cta-box::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at center,var(--accent-dim) 0%,transparent 50%);pointer-events:none}
+        .cta-box h2{font-family:'Space Grotesk',sans-serif;font-size:clamp(1.8rem,4vw,2.5rem);font-weight:700;letter-spacing:-1px;margin-bottom:16px;position:relative}
+        .cta-box p{color:var(--text-dim);font-size:1.1rem;margin-bottom:32px;position:relative;max-width:480px;margin-left:auto;margin-right:auto}
+        .cta-actions{display:flex;gap:16px;justify-content:center;position:relative}
+
+        /* FOOTER */
+        footer{padding:48px 0;border-top:1px solid var(--border)}
+        .footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px}
+        .footer-brand p{color:var(--text-dim);font-size:0.9rem;margin-top:12px;max-width:280px}
+        .footer-col h4{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);margin-bottom:16px}
+        .footer-col a{display:block;font-size:14px;color:var(--text-muted);padding:4px 0;transition:color 0.2s}
+        .footer-col a:hover{color:var(--text)}
+        .footer-bottom{display:flex;justify-content:space-between;align-items:center;margin-top:40px;padding-top:24px;border-top:1px solid var(--border);color:var(--text-muted);font-size:13px}
+
+        /* ANIMATIONS */
+        @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+        .fade-up{animation:fadeUp 0.6s ease both}
+        .delay-1{animation-delay:0.1s}
+        .delay-2{animation-delay:0.2s}
+        .delay-3{animation-delay:0.3s}
+
+        /* RESPONSIVE */
+        @media(max-width:768px){
+            .nav-links{display:none}
+            .nav-cta{display:none}
+            .hamburger{display:flex}
+            .mission-grid{grid-template-columns:1fr}
+            .diff-grid{grid-template-columns:1fr}
+            .team-values{grid-template-columns:1fr}
+            .footer-grid{grid-template-columns:1fr 1fr}
+            .about-hero{padding:80px 0 60px}
+        }
+        @media(max-width:480px){
+            .footer-grid{grid-template-columns:1fr}
+            .footer-bottom{flex-direction:column;gap:8px;text-align:center}
+            .cta-actions{flex-direction:column;align-items:center}
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav id="nav">
+            <a href="/" class="logo">
+                <div class="logo-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#08090d" stroke-width="2.5" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                </div>
+                Runloop
+            </a>
+            <div class="nav-links">
+                <a href="/#agents">Features</a>
+                <a href="/pricing">Pricing</a>
+                <a href="/about" class="active">About</a>
+            </div>
+            <div class="nav-cta">
+                <a href="/login" class="btn-ghost">Log in</a>
+                <a href="/signup" class="btn-primary">Sign Up</a>
+            </div>
+            <div class="hamburger" onclick="document.querySelector('.mobile-menu').classList.toggle('open')">
+                <span></span><span></span><span></span>
+            </div>
+        </nav>
+    </div>
+    <div class="mobile-menu">
+        <a href="/#agents">Features</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/about">About</a>
+        <a href="/login">Log in</a>
+        <a href="/signup" class="btn-primary" style="text-align:center;margin-top:8px">Sign Up</a>
+    </div>
+
+    <!-- HERO -->
+    <section class="about-hero">
+        <div class="container">
+            <div class="section-label fade-up">About Runloop</div>
+            <h1 class="fade-up delay-1">Building the <span class="gradient">autonomous future</span></h1>
+            <p class="fade-up delay-2">We started Runloop because we saw a world where AI could do more than answer questions. It could build products, run campaigns, close deals, and manage operations -- all while the founder focuses on what matters most: the vision.</p>
+        </div>
+    </section>
+
+    <!-- MISSION -->
+    <section class="mission">
+        <div class="container">
+            <div class="mission-grid">
+                <div>
+                    <div class="mission-label fade-up">Our Mission</div>
+                    <h2 class="fade-up delay-1">We believe every founder deserves a full team</h2>
+                    <p class="fade-up delay-2">The best ideas die not because they're bad, but because one person can't do everything. Marketing, engineering, sales, ops -- it's too much for any individual, and hiring a full team is too expensive for most early-stage companies.</p>
+                    <p class="fade-up delay-2">Runloop changes that equation entirely. We give solo founders and small teams the same operational capacity as a 50-person company. Six specialized AI agents work around the clock, coordinating with each other and shipping real, measurable work every single day.</p>
+                    <p class="fade-up delay-3">This isn't about replacing humans. It's about giving founders superpowers. You set the direction. Your agents handle the execution. Your company moves at a pace that was previously impossible.</p>
+                </div>
+                <div class="mission-visual fade-up delay-2">
+                    <div class="mission-stat">
+                        <div class="mission-stat-value green">24/7</div>
+                        <div class="mission-stat-label">Agents working while you sleep</div>
+                    </div>
+                    <div class="mission-stat">
+                        <div class="mission-stat-value purple">6x</div>
+                        <div class="mission-stat-label">Functional areas covered autonomously</div>
+                    </div>
+                    <div class="mission-stat">
+                        <div class="mission-stat-value blue">1000+</div>
+                        <div class="mission-stat-label">Tasks completed per month, per company</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- DIFFERENTIATORS -->
+    <section class="differentiators">
+        <div class="container">
+            <div class="diff-header">
+                <div class="section-label fade-up">How We're Different</div>
+                <h2 class="fade-up delay-1">Not another chatbot</h2>
+                <p class="fade-up delay-2">Most AI tools generate text. Runloop generates results.</p>
+            </div>
+            <div class="diff-grid">
+                <div class="diff-card fade-up">
+                    <div class="diff-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    </div>
+                    <h3>Real execution, not just chat</h3>
+                    <p>Our agents don't just suggest what you should do. They actually do it. Write the code, send the email, deploy the feature, publish the post. Real actions with real outputs you can verify in your dashboard.</p>
+                </div>
+                <div class="diff-card fade-up delay-1">
+                    <div class="diff-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                    </div>
+                    <h3>Multi-agent coordination</h3>
+                    <p>Our agents communicate with each other. When the Engineering agent ships a new feature, the Growth agent writes about it. When Research finds a competitor move, Sales adjusts its messaging. It's a team, not isolated tools.</p>
+                </div>
+                <div class="diff-card fade-up delay-2">
+                    <div class="diff-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                    </div>
+                    <h3>Full business stack</h3>
+                    <p>From engineering to sales, research to operations -- we cover every function a business needs to operate. No stitching together a dozen different tools. One platform, one dashboard, one team of agents working in concert.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- TEAM -->
+    <section class="team">
+        <div class="container">
+            <div class="team-content">
+                <div class="section-label fade-up">The Team</div>
+                <h2 class="fade-up delay-1">Built by a small team obsessed with autonomous AI</h2>
+                <p class="fade-up delay-2">We're a tight-knit group of engineers, researchers, and operators who have spent years at the intersection of AI and product. We've built ML systems at scale, launched products used by millions, and now we're channeling all of that into Runloop.</p>
+                <div class="team-avatars fade-up delay-2">
+                    <div class="team-avatar">A</div>
+                    <div class="team-avatar">K</div>
+                    <div class="team-avatar">M</div>
+                    <div class="team-avatar">S</div>
+                    <div class="team-avatar">J</div>
+                </div>
+                <div class="team-tagline fade-up delay-3">Small team. Big ambition. Shipping daily.</div>
+                <div class="team-values fade-up delay-3">
+                    <div class="team-value">
+                        <h4>Ship daily</h4>
+                        <p>Progress over perfection. We iterate fast and learn faster.</p>
+                    </div>
+                    <div class="team-value">
+                        <h4>Think autonomously</h4>
+                        <p>We build what we believe in. Every team member owns their domain.</p>
+                    </div>
+                    <div class="team-value">
+                        <h4>Stay curious</h4>
+                        <p>The best ideas come from exploring the edges of what's possible.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta">
+        <div class="container">
+            <div class="cta-box">
+                <h2>Ready to join us?</h2>
+                <p>Whether you want to use Runloop to power your business or join the team building it -- we'd love to hear from you.</p>
+                <div class="cta-actions">
+                    <a href="/signup" class="btn-primary btn-primary-lg" style="position:relative">Start Building Free</a>
+                    <a href="mailto:hello@runloop.ai" style="padding:14px 32px;border-radius:10px;font-size:16px;font-weight:600;border:1px solid var(--border-light);color:var(--text);transition:all 0.2s;display:inline-block;position:relative" onmouseover="this.style.borderColor='var(--accent)';this.style.background='var(--accent-dim)'" onmouseout="this.style.borderColor='var(--border-light)';this.style.background='transparent'">Get in Touch</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer>
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-brand">
+                    <div class="logo">
+                        <div class="logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="#08090d" stroke-width="2.5" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+                        Runloop
+                    </div>
+                    <p>The autonomous operating system for business. AI agents that actually ship work.</p>
+                </div>
+                <div class="footer-col">
+                    <h4>Product</h4>
+                    <a href="/#agents">Agents</a>
+                    <a href="/pricing">Pricing</a>
+                    <a href="/dashboard">Dashboard</a>
+                    <a href="#">API Docs</a>
+                </div>
+                <div class="footer-col">
+                    <h4>Company</h4>
+                    <a href="/about">About</a>
+                    <a href="#">Blog</a>
+                    <a href="#">Careers</a>
+                </div>
+                <div class="footer-col">
+                    <h4>Support</h4>
+                    <a href="#">Documentation</a>
+                    <a href="#">Contact</a>
+                    <a href="#">Status</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <span>&copy; 2026 Runloop. All rights reserved.</span>
+                <span>Built with autonomous AI.</span>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+    // Nav scroll
+    window.addEventListener('scroll', () => {
+        document.getElementById('nav').classList.toggle('scrolled', window.scrollY > 20);
+    });
+
+    // Polsia Analytics
+    (function() {
+        var slug = 'runloop';
+        if (!slug || slug === '__POLSIA_' + 'SLUG__') return;
+        var vid = localStorage.getItem('polsia_vid');
+        if (!vid) {
+            vid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                var r = Math.random() * 16 | 0;
+                return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+            });
+            localStorage.setItem('polsia_vid', vid);
+        }
+        new Image().src = 'https://polsia.com/api/beacon/pixel?s=' + encodeURIComponent(slug) + '&v=' + encodeURIComponent(vid);
+    })();
+    </script>
+</body>
+</html>

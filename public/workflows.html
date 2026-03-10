@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workflows — Runloop</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{--bg:#08090d;--surface:#0f1117;--surface-2:#151821;--surface-3:#1a1e2a;--border:#1a1d27;--border-light:#252838;--text:#e8e9ed;--text-dim:#7a7f8e;--text-muted:#4a4f5e;--accent:#00e599;--accent-dim:rgba(0,229,153,0.12);--accent-glow:rgba(0,229,153,0.25);--purple:#8b5cf6;--blue:#6366f1;--amber:#f59e0b;--red:#ef4444;--cyan:#06b6d4;--sidebar-w:260px}
+        body{font-family:'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
+        body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0}
+        a{color:inherit;text-decoration:none}input,select,textarea,button{font-family:inherit}
+        .app{display:flex;min-height:100vh;position:relative;z-index:1}
+        .sidebar{width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);padding:0;display:flex;flex-direction:column;position:fixed;top:0;bottom:0;left:0;z-index:50;transition:transform 0.3s cubic-bezier(.4,0,.2,1)}
+        .sidebar-header{padding:20px 20px 18px;border-bottom:1px solid var(--border)}
+        .logo{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px;letter-spacing:-0.5px;display:flex;align-items:center;gap:10px}
+        .logo-mark{width:30px;height:30px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .logo-mark svg{width:16px;height:16px}
+        .sidebar-nav{flex:1;padding:12px 12px 0;overflow-y:auto}
+        .nav-section{margin-bottom:16px}
+        .nav-section-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1.8px;color:var(--text-muted);padding:8px 12px 6px}
+        .nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:14px;font-weight:500;color:var(--text-dim);transition:all 0.15s;cursor:pointer}
+        .nav-item:hover{color:var(--text);background:var(--surface-2)}
+        .nav-item.active{color:var(--accent);background:var(--accent-dim)}
+        .nav-item .icon{width:20px;text-align:center;font-size:15px;flex-shrink:0}
+        .sidebar-footer{padding:12px 16px;border-top:1px solid var(--border)}
+        .user-pill{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;transition:background 0.15s;cursor:pointer;position:relative}
+        .user-pill:hover{background:var(--surface-2)}
+        .user-avatar{width:34px;height:34px;border-radius:8px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--accent);flex-shrink:0}
+        .user-info{flex:1;min-width:0}
+        .user-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .user-email{font-size:11px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .user-dropdown{position:absolute;bottom:calc(100% + 8px);left:0;right:0;background:var(--surface-2);border:1px solid var(--border-light);border-radius:10px;padding:6px;display:none;box-shadow:0 -8px 32px rgba(0,0,0,0.4);z-index:60}
+        .user-dropdown.open{display:block}
+        .user-dropdown-item{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:6px;font-size:13px;color:var(--text-dim);cursor:pointer;transition:all 0.12s;border:none;background:none;width:100%;text-align:left}
+        .user-dropdown-item:hover{background:var(--surface-3);color:var(--text)}
+        .user-dropdown-item.danger{color:var(--red)}
+
+        .main{flex:1;margin-left:var(--sidebar-w);padding:32px 40px 48px;min-height:100vh}
+        .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px}
+        .page-header h1{font-family:'Space Grotesk',sans-serif;font-size:1.85rem;font-weight:700;letter-spacing:-0.5px}
+
+        .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s}
+        .btn-primary{padding:10px 22px;background:var(--accent);color:#08090d}
+        .btn-primary:hover{opacity:0.9;box-shadow:0 4px 16px var(--accent-glow)}
+        .btn-secondary{padding:10px 22px;background:var(--surface-2);color:var(--text);border:1px solid var(--border)}
+        .btn-sm{padding:6px 14px;font-size:12px}
+        .btn-ghost{padding:6px 12px;background:none;color:var(--text-dim);border:1px solid var(--border)}
+        .btn-ghost:hover{color:var(--text);border-color:var(--border-light)}
+        .btn-danger{padding:6px 14px;background:rgba(239,68,68,0.1);color:var(--red);border:1px solid rgba(239,68,68,0.2);font-size:12px}
+
+        /* Workflow cards */
+        .workflow-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:20px}
+        .workflow-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;transition:all 0.3s;position:relative;overflow:hidden}
+        .workflow-card:hover{border-color:var(--border-light);transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,0.2)}
+        .workflow-card::before{content:'';position:absolute;inset:0;border-radius:16px;padding:1px;background:linear-gradient(135deg,rgba(255,255,255,0.04) 0%,transparent 50%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+        .wf-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+        .wf-name{font-family:'Space Grotesk',sans-serif;font-size:1rem;font-weight:600}
+        .wf-desc{font-size:13px;color:var(--text-dim);margin-bottom:16px;line-height:1.5}
+        .wf-meta{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+        .wf-trigger{font-size:11px;padding:3px 10px;border-radius:100px;background:rgba(99,102,241,0.1);color:var(--blue);font-weight:600;text-transform:capitalize}
+        .wf-steps{font-size:12px;color:var(--text-muted)}
+        .wf-enabled{font-size:11px;padding:3px 10px;border-radius:100px;font-weight:600}
+        .wf-enabled.yes{background:rgba(0,229,153,0.1);color:var(--accent)}
+        .wf-enabled.no{background:var(--surface-3);color:var(--text-muted)}
+        .wf-actions{display:flex;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)}
+
+        /* Steps display */
+        .steps-flow{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:12px}
+        .step-node{padding:4px 10px;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;font-size:11px;font-weight:500;color:var(--text-dim)}
+        .step-arrow{color:var(--text-muted);font-size:12px}
+
+        /* Modal */
+        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);z-index:200;align-items:center;justify-content:center}
+        .modal-overlay.open{display:flex}
+        .modal{background:var(--surface);border:1px solid var(--border-light);border-radius:16px;padding:32px;width:100%;max-width:600px;max-height:90vh;overflow-y:auto}
+        .modal h2{font-family:'Space Grotesk',sans-serif;font-size:1.3rem;font-weight:700;margin-bottom:4px}
+        .modal-sub{color:var(--text-dim);font-size:13px;margin-bottom:24px}
+        .form-group{margin-bottom:16px}
+        .form-label{display:block;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-dim);margin-bottom:6px}
+        .form-input{width:100%;padding:10px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none;transition:border-color 0.2s}
+        .form-input:focus{border-color:var(--accent)}
+        .form-select{width:100%;padding:10px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none;appearance:none;cursor:pointer}
+        .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:24px}
+        .steps-editor{margin-top:8px}
+        .step-row{display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;padding:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px}
+        .step-row .step-num{width:28px;height:28px;border-radius:50%;background:var(--accent-dim);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+        .step-row .step-fields{flex:1}
+        .step-row input,.step-row select{margin-bottom:6px}
+
+        .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 40px;text-align:center}
+        .empty-icon{font-size:48px;margin-bottom:16px;opacity:0.6}
+        .empty-title{font-family:'Space Grotesk',sans-serif;font-size:1.2rem;font-weight:600;margin-bottom:8px}
+        .empty-desc{color:var(--text-dim);font-size:14px;max-width:360px;margin-bottom:24px}
+
+        .toast-container{position:fixed;top:20px;right:20px;z-index:1000;display:flex;flex-direction:column;gap:8px}
+        .toast{padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;backdrop-filter:blur(12px);animation:slideIn 0.3s ease;border:1px solid var(--border)}
+        .toast.success{background:rgba(0,229,153,0.15);color:var(--accent)}
+        .toast.error{background:rgba(239,68,68,0.15);color:var(--red)}
+        @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+        .fade-up{opacity:0;transform:translateY(16px);animation:fadeUp 0.5s ease forwards}
+        @keyframes fadeUp{to{opacity:1;transform:translateY(0)}}
+        .delay-1{animation-delay:0.05s}.delay-2{animation-delay:0.1s}
+
+        .mobile-toggle{display:none;position:fixed;top:16px;left:16px;z-index:100;width:40px;height:40px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);cursor:pointer;align-items:center;justify-content:center}
+        .hamburger-lines{display:flex;flex-direction:column;gap:4px}
+        .hamburger-lines span{display:block;width:18px;height:2px;background:var(--text);border-radius:2px}
+        .sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:40}
+        @media(max-width:768px){
+            .mobile-toggle{display:flex}.sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}.sidebar-backdrop.open{display:block}
+            .main{margin-left:0;padding:24px 16px 40px;padding-top:68px}
+            .workflow-grid{grid-template-columns:1fr}
+        }
+    </style>
+</head>
+<body>
+    <button class="mobile-toggle" id="mobileToggle"><div class="hamburger-lines"><span></span><span></span><span></span></div></button>
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+    <div class="app">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header"><a href="/dashboard" class="logo"><div class="logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="#08090d" stroke-width="2.5" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>Runloop</a></div>
+            <nav class="sidebar-nav">
+                <div class="nav-section"><div class="nav-section-label">Main</div>
+                    <a href="/dashboard" class="nav-item"><span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>Overview</a>
+                    <a href="/chat" class="nav-item"><span class="icon">💬</span>Chat</a>
+                    <a href="/tasks" class="nav-item"><span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span>Tasks</a>
+                    <a href="/analytics" class="nav-item"><span class="icon">📊</span>Analytics</a>
+                </div>
+                <div class="nav-section"><div class="nav-section-label">Knowledge</div>
+                    <a href="/documents" class="nav-item"><span class="icon">📄</span>Documents</a><a href="/memory" class="nav-item"><span class="icon">🧠</span>Memory</a><a href="/skills" class="nav-item"><span class="icon">⚙️</span>Skills</a><a href="/learnings" class="nav-item"><span class="icon">💡</span>Learnings</a>
+                </div>
+                <div class="nav-section"><div class="nav-section-label">Automation</div>
+                    <a href="/workflows" class="nav-item active"><span class="icon">🔄</span>Workflows</a><a href="/email" class="nav-item"><span class="icon">📧</span>Email</a><a href="/cycles" class="nav-item"><span class="icon">🌙</span>Cycles</a><a href="/reports" class="nav-item"><span class="icon">📋</span>Reports</a>
+                </div>
+                <div class="nav-section"><div class="nav-section-label">Build</div>
+                    <a href="/agent-factory" class="nav-item"><span class="icon">🏭</span>Agent Factory</a><a href="/settings" class="nav-item"><span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></span>Settings</a>
+                </div>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-pill" onclick="document.getElementById('userDropdown').classList.toggle('open')">
+                    <div class="user-avatar" id="userAvatar">--</div>
+                    <div class="user-info"><div class="user-name" id="userName">Loading...</div><div class="user-email" id="userEmail">...</div></div>
+                    <div class="user-dropdown" id="userDropdown">
+                        <a href="/settings" class="user-dropdown-item">Settings</a>
+                        <button class="user-dropdown-item danger" onclick="event.preventDefault();event.stopPropagation();fetch('/api/auth/logout',{method:'POST'}).then(()=>window.location.href='/login')">Log out</button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main">
+            <div class="page-header fade-up">
+                <div><h1>Workflows</h1></div>
+                <button class="btn btn-primary" onclick="openCreate()">+ New Workflow</button>
+            </div>
+            <div class="workflow-grid fade-up delay-1" id="workflowGrid">
+                <div class="empty-state" id="emptyState">
+                    <div class="empty-icon">🔄</div>
+                    <div class="empty-title">No workflows yet</div>
+                    <div class="empty-desc">Create automated workflows to chain agent tasks together.</div>
+                    <button class="btn btn-primary" onclick="openCreate()">Create Workflow</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="modal-overlay" id="createModal">
+        <div class="modal">
+            <h2>Create Workflow</h2>
+            <p class="modal-sub">Chain multiple agent tasks into an automated pipeline</p>
+            <form id="createForm" onsubmit="handleCreate(event)">
+                <div class="form-group"><label class="form-label">Workflow Name</label><input type="text" class="form-input" id="wfName" placeholder="e.g. Content Pipeline" required></div>
+                <div class="form-group"><label class="form-label">Description</label><input type="text" class="form-input" id="wfDesc" placeholder="What does this workflow do?"></div>
+                <div class="form-group">
+                    <label class="form-label">Trigger</label>
+                    <select class="form-select" id="wfTrigger">
+                        <option value="manual">Manual</option>
+                        <option value="schedule">On Schedule</option>
+                        <option value="task_complete">On Task Complete</option>
+                        <option value="webhook">Webhook</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Steps</label>
+                    <div class="steps-editor" id="stepsEditor">
+                        <div class="step-row">
+                            <div class="step-num">1</div>
+                            <div class="step-fields">
+                                <select class="form-select step-agent" style="margin-bottom:6px"><option value="">Select agent...</option></select>
+                                <input type="text" class="form-input step-task" placeholder="Task description for this step">
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="addStep()" style="margin-top:8px">+ Add Step</button>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeCreate()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+<script>
+let agents = [];
+let stepCount = 1;
+
+function showToast(msg, type = 'success') { const c = document.getElementById('toastContainer'); const t = document.createElement('div'); t.className = `toast ${type}`; t.textContent = msg; c.appendChild(t); setTimeout(() => t.remove(), 3000); }
+
+async function loadUser() {
+    try { const res = await fetch('/api/auth/me'); if (!res.ok) { window.location.href = '/login'; return; } const { user } = await res.json(); document.getElementById('userName').textContent = user.name || 'User'; document.getElementById('userEmail').textContent = user.email; document.getElementById('userAvatar').textContent = (user.name || 'U')[0].toUpperCase(); } catch { window.location.href = '/login'; }
+}
+
+async function loadAgents() {
+    try { const res = await fetch('/api/agents'); if (res.ok) { const data = await res.json(); agents = data.agents || data || []; populateAgentSelects(); } } catch {}
+}
+
+function populateAgentSelects() {
+    document.querySelectorAll('.step-agent').forEach(sel => {
+        const val = sel.value;
+        sel.innerHTML = '<option value="">Select agent...</option>' + agents.map(a => `<option value="${a.id}">${a.icon || '🤖'} ${escapeHtml(a.name)}</option>`).join('');
+        sel.value = val;
+    });
+}
+
+async function loadWorkflows() {
+    try {
+        const res = await fetch('/api/workflows');
+        if (!res.ok) throw new Error('Failed');
+        const data = await res.json();
+        const workflows = data.workflows || data || [];
+        renderWorkflows(workflows);
+    } catch { renderWorkflows([]); }
+}
+
+function renderWorkflows(workflows) {
+    const grid = document.getElementById('workflowGrid');
+    if (!workflows.length) {
+        grid.innerHTML = '<div class="empty-state"><div class="empty-icon">🔄</div><div class="empty-title">No workflows yet</div><div class="empty-desc">Create automated workflows to chain agent tasks together.</div><button class="btn btn-primary" onclick="openCreate()">Create Workflow</button></div>';
+        return;
+    }
+    grid.innerHTML = workflows.map(w => {
+        const steps = w.steps || [];
+        return `
+        <div class="workflow-card">
+            <div class="wf-header">
+                <div class="wf-name">${escapeHtml(w.name)}</div>
+                <span class="wf-enabled ${w.enabled ? 'yes' : 'no'}">${w.enabled ? 'Active' : 'Disabled'}</span>
+            </div>
+            <div class="wf-desc">${escapeHtml(w.description || 'No description')}</div>
+            <div class="wf-meta">
+                <span class="wf-trigger">${escapeHtml(w.trigger_type || 'manual')}</span>
+                <span class="wf-steps">${steps.length} step${steps.length !== 1 ? 's' : ''}</span>
+            </div>
+            ${steps.length ? `<div class="steps-flow">${steps.map((s, i) => `<span class="step-node">${escapeHtml(s.agent_name || s.task || `Step ${i+1}`)}</span>${i < steps.length - 1 ? '<span class="step-arrow">→</span>' : ''}`).join('')}</div>` : ''}
+            <div class="wf-actions">
+                <button class="btn btn-ghost btn-sm" onclick="runWorkflow(${w.id})">▶ Run</button>
+                <button class="btn btn-ghost btn-sm" onclick="viewRuns(${w.id})" style="margin-left:auto">History</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteWorkflow(${w.id})">Delete</button>
+            </div>
+            <div class="wf-runs" id="runs-${w.id}" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"></div>
+        </div>`;
+    }).join('');
+}
+
+function openCreate() { document.getElementById('createModal').classList.add('open'); }
+function closeCreate() { document.getElementById('createModal').classList.remove('open'); }
+
+function addStep() {
+    stepCount++;
+    const editor = document.getElementById('stepsEditor');
+    const row = document.createElement('div');
+    row.className = 'step-row';
+    row.innerHTML = `<div class="step-num">${stepCount}</div><div class="step-fields"><select class="form-select step-agent" style="margin-bottom:6px"><option value="">Select agent...</option></select><input type="text" class="form-input step-task" placeholder="Task description for this step"></div>`;
+    editor.appendChild(row);
+    populateAgentSelects();
+}
+
+async function handleCreate(e) {
+    e.preventDefault();
+    const steps = [];
+    document.querySelectorAll('.step-row').forEach(row => {
+        const agentId = row.querySelector('.step-agent')?.value;
+        const task = row.querySelector('.step-task')?.value;
+        if (agentId && task) steps.push({ agent_id: parseInt(agentId), task, agent_name: agents.find(a => a.id == agentId)?.name || '' });
+    });
+    try {
+        const res = await fetch('/api/workflows', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: document.getElementById('wfName').value, description: document.getElementById('wfDesc').value, trigger_type: document.getElementById('wfTrigger').value, steps })
+        });
+        if (!res.ok) throw new Error('Failed');
+        showToast('Workflow created');
+        closeCreate();
+        document.getElementById('createForm').reset();
+        stepCount = 1;
+        document.getElementById('stepsEditor').innerHTML = '<div class="step-row"><div class="step-num">1</div><div class="step-fields"><select class="form-select step-agent" style="margin-bottom:6px"><option value="">Select agent...</option></select><input type="text" class="form-input step-task" placeholder="Task description for this step"></div></div>';
+        populateAgentSelects();
+        await loadWorkflows();
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function runWorkflow(id) {
+    try {
+        const res = await fetch(`/api/workflows/${id}/run`, { method: 'POST' });
+        if (!res.ok) throw new Error('Failed');
+        showToast('Workflow started');
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function deleteWorkflow(id) {
+    if (!confirm('Delete this workflow?')) return;
+    try {
+        const res = await fetch(`/api/workflows/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Failed');
+        showToast('Workflow deleted');
+        await loadWorkflows();
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function viewRuns(id) {
+    const runsEl = document.getElementById(`runs-${id}`);
+    if (runsEl.style.display !== 'none') { runsEl.style.display = 'none'; return; }
+    try {
+        const res = await fetch(`/api/workflows/${id}/runs`);
+        const data = await res.json();
+        const runs = data.runs || [];
+        if (!runs.length) { runsEl.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:8px 0">No runs yet</div>'; }
+        else { runsEl.innerHTML = runs.map(r => `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="padding:2px 8px;border-radius:4px;font-weight:600;${r.status === 'completed' ? 'background:rgba(0,229,153,0.1);color:var(--accent)' : r.status === 'failed' ? 'background:rgba(239,68,68,0.1);color:var(--red)' : 'background:rgba(245,158,11,0.1);color:var(--amber)'}">${r.status}</span><span style="color:var(--text-dim)">${new Date(r.created_at).toLocaleString()}</span></div>`).join(''); }
+        runsEl.style.display = 'block';
+    } catch (err) { showToast('Failed to load runs', 'error'); }
+}
+
+function escapeHtml(str) { return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+document.getElementById('mobileToggle')?.addEventListener('click', () => { document.getElementById('sidebar').classList.toggle('open'); document.getElementById('sidebarBackdrop').classList.toggle('open'); });
+document.getElementById('sidebarBackdrop')?.addEventListener('click', () => { document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebarBackdrop').classList.remove('open'); });
+
+(async () => { await Promise.all([loadUser(), loadAgents(), loadWorkflows()]); })();
+</script>
+<script src="/sidebar.js"></script>
+</body>
+</html>

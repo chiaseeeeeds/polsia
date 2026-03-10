@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Explore codebase and understand current state",
+    "status": "completed",
+    "activeForm": "Exploring codebase and understanding current state"
+  },
+  {
+    "content": "Set env vars on Render + install deps",
+    "status": "completed",
+    "activeForm": "Setting env vars on Render and installing deps"
+  },
+  {
+    "content": "Wire real Brave, Postmark, Hunter APIs + complete all tool definitions",
+    "status": "completed",
+    "activeForm": "Wiring real external APIs and completing tool definitions"
+  },
+  {
+    "content": "Add SSE streaming to chat + multi-turn tool loop",
+    "status": "completed",
+    "activeForm": "Adding SSE streaming and multi-turn tool loop"
+  },
+  {
+    "content": "Add graceful degradation + settings/integrations",
+    "status": "completed",
+    "activeForm": "Adding graceful degradation and integrations"
+  },
+  {
+    "content": "Deploy and verify end-to-end",
+    "status": "in_progress",
+    "activeForm": "Deploying and verifying end-to-end"
+  }
+]

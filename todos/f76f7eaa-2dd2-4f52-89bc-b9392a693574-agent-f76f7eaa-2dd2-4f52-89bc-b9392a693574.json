@@ -1,0 +1,42 @@
+[
+  {
+    "content": "Fix Bug 1: Add type: 'function' to tool_calls when reconstructing from DB",
+    "status": "completed",
+    "activeForm": "Fixed Bug 1"
+  },
+  {
+    "content": "Fix Bug 2: Add executability_type to all task INSERT statements",
+    "status": "completed",
+    "activeForm": "Fixed Bug 2"
+  },
+  {
+    "content": "Fix Bug 3: Add mcp_mounts column to agents table schema",
+    "status": "completed",
+    "activeForm": "Fixed Bug 3"
+  },
+  {
+    "content": "Verify all backend systems are wired (tool handlers, worker, etc)",
+    "status": "completed",
+    "activeForm": "Verified all backend systems"
+  },
+  {
+    "content": "Verify SKILL.md files are populated",
+    "status": "completed",
+    "activeForm": "Verified SKILL.md files populated"
+  },
+  {
+    "content": "Run exhaustive endpoint tests",
+    "status": "completed",
+    "activeForm": "Ran exhaustive endpoint tests"
+  },
+  {
+    "content": "Commit all changes and push to GitHub",
+    "status": "in_progress",
+    "activeForm": "Committing and pushing to GitHub"
+  },
+  {
+    "content": "Send completion notification to owner",
+    "status": "pending",
+    "activeForm": "Sending completion notification"
+  }
+]

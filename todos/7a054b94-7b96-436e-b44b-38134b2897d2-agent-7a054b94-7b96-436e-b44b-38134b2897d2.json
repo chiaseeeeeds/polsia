@@ -1,0 +1,42 @@
+[
+  {
+    "content": "Fix DB constraint bugs (priority, tag, task_category)",
+    "status": "in_progress",
+    "activeForm": "Fixing DB constraint bugs"
+  },
+  {
+    "content": "Build animated agent avatar + live status + chain of thought",
+    "status": "pending",
+    "activeForm": "Building animated agent avatar"
+  },
+  {
+    "content": "Build approval flows / human decision requests",
+    "status": "pending",
+    "activeForm": "Building approval flows"
+  },
+  {
+    "content": "Build rich activity feed with specialized renderers",
+    "status": "pending",
+    "activeForm": "Building rich activity feed"
+  },
+  {
+    "content": "Build monetization UX (modals, credit counter)",
+    "status": "pending",
+    "activeForm": "Building monetization UX"
+  },
+  {
+    "content": "Build onboarding/welcome experience",
+    "status": "pending",
+    "activeForm": "Building onboarding experience"
+  },
+  {
+    "content": "Build missing UI sections (Email, Twitter, Ads, etc.)",
+    "status": "pending",
+    "activeForm": "Building missing UI sections"
+  },
+  {
+    "content": "Deploy and verify all features work",
+    "status": "pending",
+    "activeForm": "Deploying and verifying"
+  }
+]

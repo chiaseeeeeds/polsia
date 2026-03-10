@@ -1,0 +1,12 @@
+[
+  {
+    "content": "Phase 1-4: All feature code complete",
+    "status": "completed",
+    "activeForm": "Completed all feature phases"
+  },
+  {
+    "content": "Phase 5: Verify deploy + smoke test all pages",
+    "status": "in_progress",
+    "activeForm": "Running smoke test and verifying deployment"
+  }
+]

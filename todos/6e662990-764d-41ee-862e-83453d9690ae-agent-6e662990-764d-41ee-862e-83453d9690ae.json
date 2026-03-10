@@ -1,0 +1,27 @@
+[
+  {
+    "content": "Fix migration 010 to DROP and recreate conflicting tables",
+    "status": "completed",
+    "activeForm": "Fixing migration 010 to DROP and recreate conflicting tables"
+  },
+  {
+    "content": "Push changes and verify build succeeds",
+    "status": "completed",
+    "activeForm": "Pushing changes and verifying build succeeds"
+  },
+  {
+    "content": "Seed 8 platform agents in database",
+    "status": "completed",
+    "activeForm": "Seeding 8 platform agents in database"
+  },
+  {
+    "content": "Test and verify app works end-to-end",
+    "status": "in_progress",
+    "activeForm": "Testing and verifying app works end-to-end"
+  },
+  {
+    "content": "Build missing features per superprompt requirements",
+    "status": "pending",
+    "activeForm": "Building missing features per superprompt requirements"
+  }
+]

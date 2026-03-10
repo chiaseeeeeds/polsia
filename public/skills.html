@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skills — Runloop</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ── Reset & Tokens ────────────────────────────── */
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root {
+            --bg:#08090d;
+            --surface:#0f1117;
+            --surface-2:#151821;
+            --surface-3:#1a1e2a;
+            --border:#1a1d27;
+            --border-light:#252838;
+            --text:#e8e9ed;
+            --text-dim:#7a7f8e;
+            --text-muted:#4a4f5e;
+            --accent:#00e599;
+            --accent-dim:rgba(0,229,153,0.12);
+            --accent-glow:rgba(0,229,153,0.25);
+            --purple:#8b5cf6;
+            --blue:#6366f1;
+            --amber:#f59e0b;
+            --red:#ef4444;
+            --cyan:#06b6d4;
+            --sidebar-w:260px;
+        }
+        body {
+            font-family:'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+            background:var(--bg);
+            color:var(--text);
+            line-height:1.6;
+            overflow-x:hidden;
+        }
+        /* noise overlay */
+        body::before {
+            content:'';position:fixed;top:0;left:0;right:0;bottom:0;
+            background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+            pointer-events:none;z-index:0;
+        }
+        a{color:inherit;text-decoration:none}
+        input,select,textarea,button{font-family:inherit}
+
+        /* ── App Shell ────────────────────────────── */
+        .app{display:flex;min-height:100vh;position:relative;z-index:1}
+
+        /* ── Sidebar ────────────────────────────── */
+        .sidebar {
+            width:var(--sidebar-w);
+            background:var(--surface);
+            border-right:1px solid var(--border);
+            padding:0;
+            display:flex;
+            flex-direction:column;
+            position:fixed;
+            top:0;bottom:0;left:0;
+            z-index:50;
+            transition:transform 0.3s cubic-bezier(.4,0,.2,1);
+        }
+        .sidebar-header {
+            padding:20px 20px 18px;
+            border-bottom:1px solid var(--border);
+        }
+        .logo {
+            font-family:'Space Grotesk',sans-serif;
+            font-weight:700;font-size:20px;letter-spacing:-0.5px;
+            display:flex;align-items:center;gap:10px;
+        }
+        .logo-mark {
+            width:30px;height:30px;border-radius:8px;
+            background:var(--accent);
+            display:flex;align-items:center;justify-content:center;flex-shrink:0;
+        }
+        .logo-mark svg{width:16px;height:16px}
+        .sidebar-nav{flex:1;padding:12px 12px 0;overflow-y:auto}
+        .nav-section{margin-bottom:16px}
+        .nav-section-label {
+            font-size:10px;font-weight:600;
+            text-transform:uppercase;letter-spacing:1.8px;
+            color:var(--text-muted);
+            padding:8px 12px 6px;
+        }
+        .nav-item {
+            display:flex;align-items:center;gap:10px;
+            padding:10px 12px;border-radius:8px;
+            font-size:14px;font-weight:500;color:var(--text-dim);
+            transition:all 0.15s;cursor:pointer;
+        }
+        .nav-item:hover{color:var(--text);background:var(--surface-2)}
+        .nav-item.active{color:var(--accent);background:var(--accent-dim)}
+        .nav-item .icon{width:20px;text-align:center;font-size:15px;flex-shrink:0}
+
+        /* sidebar footer / user pill */
+        .sidebar-footer{padding:12px 16px;border-top:1px solid var(--border)}
+        .user-pill {
+            display:flex;align-items:center;gap:10px;
+            padding:8px 10px;border-radius:10px;
+            transition:background 0.15s;cursor:pointer;
+            position:relative;
+        }
+        .user-pill:hover{background:var(--surface-2)}
+        .user-avatar {
+            width:34px;height:34px;border-radius:8px;
+            background:var(--accent-dim);
+            display:flex;align-items:center;justify-content:center;
+            font-size:14px;font-weight:700;color:var(--accent);flex-shrink:0;
+        }
+        .user-info{flex:1;min-width:0}
+        .user-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .user-email{font-size:11px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .user-menu-toggle{color:var(--text-muted);font-size:16px;flex-shrink:0;transition:transform 0.2s}
+        .user-pill.open .user-menu-toggle{transform:rotate(180deg)}
+
+        /* user dropdown */
+        .user-dropdown {
+            position:absolute;bottom:calc(100% + 8px);left:0;right:0;
+            background:var(--surface-2);
+            border:1px solid var(--border-light);
+            border-radius:10px;
+            padding:6px;
+            display:none;
+            box-shadow:0 -8px 32px rgba(0,0,0,0.4);
+            z-index:60;
+        }
+        .user-dropdown.open{display:block}
+        .user-dropdown-item {
+            display:flex;align-items:center;gap:8px;
+            padding:9px 12px;border-radius:6px;
+            font-size:13px;color:var(--text-dim);
+            cursor:pointer;transition:all 0.12s;border:none;
+            background:none;width:100%;text-align:left;
+        }
+        .user-dropdown-item:hover{background:var(--surface-3);color:var(--text)}
+        .user-dropdown-item.danger{color:var(--red)}
+        .user-dropdown-item.danger:hover{background:rgba(239,68,68,0.08)}
+
+        /* ── Main Content ────────────────────────────── */
+        .main{flex:1;margin-left:var(--sidebar-w);padding:32px 40px 48px;min-height:100vh}
+
+        /* ── Page Header ────────────────────────────── */
+        .page-header{margin-bottom:32px;display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap}
+        .page-header-text h1 {
+            font-family:'Space Grotesk',sans-serif;
+            font-size:1.85rem;font-weight:700;letter-spacing:-0.5px;
+            margin-bottom:4px;
+        }
+        .page-header-text p{color:var(--text-dim);font-size:0.95rem}
+
+        /* ── Buttons ────────────────────────────── */
+        .btn{
+            display:inline-flex;align-items:center;justify-content:center;gap:6px;
+            border:none;border-radius:8px;
+            font-size:13px;font-weight:600;
+            cursor:pointer;transition:all 0.2s;
+        }
+        .btn-primary {
+            padding:10px 22px;
+            background:var(--accent);color:#08090d;
+        }
+        .btn-primary:hover{opacity:0.9;box-shadow:0 4px 16px var(--accent-glow)}
+        .btn-primary:disabled{opacity:0.5;cursor:not-allowed;transform:none;box-shadow:none}
+        .btn-secondary {
+            padding:10px 22px;
+            background:var(--surface-2);color:var(--text);
+            border:1px solid var(--border);
+        }
+        .btn-secondary:hover{border-color:var(--border-light)}
+
+        /* ── Search Bar ────────────────────────────── */
+        .search-bar {
+            position:relative;
+            margin-bottom:28px;
+            max-width:520px;
+        }
+        .search-bar svg {
+            position:absolute;left:14px;top:50%;transform:translateY(-50%);
+            color:var(--text-muted);pointer-events:none;
+        }
+        .search-input {
+            width:100%;padding:12px 14px 12px 42px;
+            background:var(--surface);
+            border:1px solid var(--border);
+            border-radius:10px;color:var(--text);
+            font-size:14px;
+            transition:all 0.2s;outline:none;
+        }
+        .search-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+        .search-input::placeholder{color:var(--text-muted)}
+
+        /* ── Skills Grid ────────────────────────────── */
+        .skills-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+        .skill-card {
+            background:var(--surface);
+            border:1px solid var(--border);
+            border-radius:14px;
+            padding:22px 24px;
+            transition:all 0.3s cubic-bezier(.4,0,.2,1);
+            cursor:pointer;
+            position:relative;
+            overflow:hidden;
+            /* glassmorphism */
+            backdrop-filter:blur(12px);
+            background:linear-gradient(135deg, rgba(15,17,23,0.85) 0%, rgba(21,24,33,0.75) 100%);
+        }
+        .skill-card::before {
+            content:'';
+            position:absolute;inset:0;
+            border-radius:14px;
+            padding:1px;
+            background:linear-gradient(135deg, rgba(255,255,255,0.06) 0%, transparent 50%);
+            -webkit-mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite:xor;
+            mask-composite:exclude;
+            pointer-events:none;
+        }
+        .skill-card:hover {
+            border-color:var(--border-light);
+            transform:translateY(-3px);
+            box-shadow:0 10px 36px rgba(0,0,0,0.25);
+        }
+        .skill-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}
+        .skill-card-title {
+            font-family:'Space Grotesk',sans-serif;
+            font-size:0.95rem;font-weight:600;
+            line-height:1.3;
+        }
+        .skill-usage {
+            display:inline-flex;align-items:center;gap:4px;
+            font-family:'JetBrains Mono',monospace;
+            font-size:11px;color:var(--text-muted);
+            background:var(--surface-2);
+            padding:3px 8px;border-radius:6px;
+            white-space:nowrap;flex-shrink:0;
+        }
+        .skill-summary{color:var(--text-dim);font-size:13px;line-height:1.5;margin-bottom:14px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+        .skill-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+        .skill-tag {
+            font-size:11px;font-weight:500;
+            padding:3px 9px;border-radius:100px;
+            background:var(--surface-2);color:var(--text-dim);
+            border:1px solid var(--border);
+        }
+        .skill-agents{display:flex;flex-wrap:wrap;gap:5px}
+        .agent-badge {
+            font-size:10px;font-weight:600;
+            padding:3px 8px;border-radius:100px;
+            text-transform:capitalize;
+            letter-spacing:0.3px;
+        }
+        .agent-badge.engineering{background:rgba(0,229,153,0.12);color:#00e599}
+        .agent-badge.research{background:rgba(99,102,241,0.12);color:#6366f1}
+        .agent-badge.growth{background:rgba(245,158,11,0.12);color:#f59e0b}
+        .agent-badge.sales{background:rgba(239,68,68,0.12);color:#ef4444}
+        .agent-badge.operations{background:rgba(139,92,246,0.12);color:#8b5cf6}
+        .agent-badge.support{background:rgba(6,182,212,0.12);color:#06b6d4}
+        .agent-badge.pm{background:rgba(236,72,153,0.12);color:#ec4899}
+        .agent-badge.qa{background:rgba(234,179,8,0.12);color:#eab308}
+        .agent-badge.default{background:var(--surface-3);color:var(--text-dim)}
+
+        /* ── Empty State ────────────────────────────── */
+        .empty-state {
+            text-align:center;padding:80px 24px;
+            grid-column:1/-1;
+        }
+        .empty-state-icon {
+            width:64px;height:64px;border-radius:16px;
+            background:var(--surface-2);
+            display:flex;align-items:center;justify-content:center;
+            margin:0 auto 20px;font-size:28px;opacity:0.5;
+        }
+        .empty-state h3 {
+            font-family:'Space Grotesk',sans-serif;
+            font-size:1.1rem;font-weight:600;
+            color:var(--text);margin-bottom:8px;
+        }
+        .empty-state p{color:var(--text-muted);font-size:14px;max-width:420px;margin:0 auto;line-height:1.6}
+
+        /* ── Loading Skeleton ────────────────────────────── */
+        .skeleton {
+            background:linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%);
+            background-size:200% 100%;
+            animation:shimmer 1.5s ease-in-out infinite;
+            border-radius:8px;
+        }
+        @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+        .skeleton-card{height:180px;border-radius:14px}
+
+        /* ── Loading Spinner ────────────────────────────── */
+        .spinner{display:none;text-align:center;padding:40px 0;grid-column:1/-1}
+        .spinner.visible{display:block}
+        .spinner svg{animation:spin 1s linear infinite;color:var(--accent)}
+        @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
+        /* ── Modal Overlay ────────────────────────────── */
+        .modal-overlay {
+            position:fixed;inset:0;
+            background:rgba(0,0,0,0.65);
+            display:none;align-items:center;justify-content:center;
+            z-index:1000;
+            backdrop-filter:blur(6px);
+            opacity:0;
+            transition:opacity 0.25s;
+        }
+        .modal-overlay.open{display:flex;opacity:1}
+        .modal-overlay.opening{display:flex}
+        .modal {
+            background:var(--surface);
+            border:1px solid var(--border);
+            border-radius:18px;
+            padding:32px;
+            max-width:640px;width:92%;
+            max-height:90vh;overflow-y:auto;
+            transform:translateY(12px) scale(0.97);
+            transition:transform 0.3s cubic-bezier(.4,0,.2,1);
+        }
+        .modal-overlay.open .modal{transform:translateY(0) scale(1)}
+
+        /* ── Detail Modal ────────────────────────────── */
+        .detail-modal .modal{max-width:720px}
+        .detail-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:24px}
+        .detail-header h2 {
+            font-family:'Space Grotesk',sans-serif;
+            font-size:1.35rem;font-weight:700;letter-spacing:-0.3px;
+        }
+        .detail-close {
+            background:var(--surface-2);border:1px solid var(--border);
+            border-radius:8px;width:34px;height:34px;
+            display:flex;align-items:center;justify-content:center;
+            cursor:pointer;color:var(--text-dim);transition:all 0.15s;flex-shrink:0;
+        }
+        .detail-close:hover{background:var(--surface-3);color:var(--text)}
+        .detail-meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}
+        .detail-usage {
+            display:inline-flex;align-items:center;gap:5px;
+            font-family:'JetBrains Mono',monospace;
+            font-size:12px;color:var(--text-dim);
+            background:var(--surface-2);
+            padding:5px 12px;border-radius:8px;
+        }
+        .detail-divider{height:1px;background:var(--border);margin:20px 0}
+
+        /* markdown reader */
+        .md-content{color:var(--text-dim);font-size:14px;line-height:1.75}
+        .md-content h1{font-family:'Space Grotesk',sans-serif;font-size:1.25rem;font-weight:700;color:var(--text);margin:28px 0 12px;letter-spacing:-0.3px}
+        .md-content h2{font-family:'Space Grotesk',sans-serif;font-size:1.1rem;font-weight:600;color:var(--text);margin:24px 0 10px;letter-spacing:-0.2px}
+        .md-content h3{font-family:'Space Grotesk',sans-serif;font-size:0.95rem;font-weight:600;color:var(--text);margin:20px 0 8px}
+        .md-content h1:first-child,.md-content h2:first-child,.md-content h3:first-child{margin-top:0}
+        .md-content p{margin:0 0 12px}
+        .md-content strong{color:var(--text);font-weight:600}
+        .md-content em{font-style:italic;color:var(--text)}
+        .md-content ul,.md-content ol{margin:0 0 12px;padding-left:20px}
+        .md-content li{margin-bottom:4px}
+        .md-content code {
+            font-family:'JetBrains Mono',monospace;
+            font-size:12px;background:var(--surface-2);
+            padding:2px 6px;border-radius:4px;color:var(--accent);
+        }
+        .md-content pre {
+            background:var(--surface-2);border:1px solid var(--border);
+            border-radius:8px;padding:14px 16px;margin:0 0 14px;
+            overflow-x:auto;
+        }
+        .md-content pre code{background:none;padding:0;font-size:13px;color:var(--text-dim)}
+        .md-content blockquote {
+            border-left:3px solid var(--accent);
+            padding:8px 16px;margin:0 0 12px;
+            background:var(--accent-dim);border-radius:0 8px 8px 0;
+        }
+        .md-content hr{border:none;height:1px;background:var(--border);margin:20px 0}
+
+        /* ── Create Modal ────────────────────────────── */
+        .create-modal .modal{max-width:580px}
+        .create-modal h2 {
+            font-family:'Space Grotesk',sans-serif;
+            font-size:1.25rem;font-weight:700;margin-bottom:4px;
+        }
+        .create-modal .modal-sub{color:var(--text-dim);font-size:14px;margin-bottom:24px}
+        .form-group{margin-bottom:18px}
+        .form-label{display:block;font-size:13px;font-weight:500;color:var(--text-dim);margin-bottom:6px}
+        .form-input {
+            width:100%;padding:11px 14px;
+            background:var(--surface-2);
+            border:1px solid var(--border);
+            border-radius:8px;color:var(--text);
+            font-size:14px;
+            transition:all 0.2s;outline:none;
+        }
+        .form-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+        .form-input::placeholder{color:var(--text-muted)}
+        textarea.form-input{min-height:160px;resize:vertical;line-height:1.5;font-family:'JetBrains Mono',monospace;font-size:13px}
+        .form-hint{font-size:11px;color:var(--text-muted);margin-top:4px}
+        .form-error{font-size:11px;color:var(--red);margin-top:4px;display:none}
+        .form-error.visible{display:block}
+
+        /* checkbox group */
+        .checkbox-group{display:flex;flex-wrap:wrap;gap:8px}
+        .checkbox-label {
+            display:inline-flex;align-items:center;gap:6px;
+            padding:7px 14px;border-radius:8px;
+            background:var(--surface-2);border:1px solid var(--border);
+            font-size:13px;color:var(--text-dim);
+            cursor:pointer;transition:all 0.15s;
+            user-select:none;
+        }
+        .checkbox-label:hover{border-color:var(--border-light);color:var(--text)}
+        .checkbox-label input{display:none}
+        .checkbox-label input:checked + .cb-check{background:var(--accent);border-color:var(--accent)}
+        .checkbox-label input:checked + .cb-check svg{opacity:1}
+        .checkbox-label:has(input:checked){border-color:var(--accent);background:var(--accent-dim);color:var(--accent)}
+        .cb-check {
+            width:16px;height:16px;border-radius:4px;
+            border:1.5px solid var(--border-light);
+            display:flex;align-items:center;justify-content:center;
+            transition:all 0.15s;flex-shrink:0;
+        }
+        .cb-check svg{width:10px;height:10px;opacity:0;transition:opacity 0.15s}
+
+        .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:28px}
+
+        /* ── Toast Notification System ────────────────────────────── */
+        .toast-container {
+            position:fixed;top:24px;right:24px;z-index:2000;
+            display:flex;flex-direction:column;gap:10px;
+            pointer-events:none;
+        }
+        .toast {
+            pointer-events:auto;
+            background:var(--surface);
+            border:1px solid var(--border);
+            border-radius:12px;
+            padding:14px 20px;
+            font-size:14px;font-weight:500;
+            display:flex;align-items:center;gap:10px;
+            box-shadow:0 12px 40px rgba(0,0,0,0.35);
+            transform:translateX(120%);
+            opacity:0;
+            transition:all 0.4s cubic-bezier(.4,0,.2,1);
+            max-width:380px;
+        }
+        .toast.visible{transform:translateX(0);opacity:1}
+        .toast.success{border-left:3px solid var(--accent)}
+        .toast.success .toast-icon{color:var(--accent)}
+        .toast.error{border-left:3px solid var(--red)}
+        .toast.error .toast-icon{color:var(--red)}
+        .toast-icon{font-size:18px;flex-shrink:0}
+        .toast-message{flex:1;color:var(--text)}
+        .toast-close {
+            background:none;border:none;color:var(--text-muted);
+            cursor:pointer;font-size:16px;padding:2px;
+            transition:color 0.15s;flex-shrink:0;
+        }
+        .toast-close:hover{color:var(--text)}
+
+        /* ── Mobile Hamburger ────────────────────────────── */
+        .mobile-toggle {
+            display:none;
+            position:fixed;top:16px;left:16px;z-index:60;
+            width:42px;height:42px;
+            background:var(--surface);
+            border:1px solid var(--border);
+            border-radius:10px;
+            align-items:center;justify-content:center;
+            cursor:pointer;
+            transition:all 0.2s;
+        }
+        .mobile-toggle:hover{background:var(--surface-2)}
+        .hamburger-lines{display:flex;flex-direction:column;gap:4px}
+        .hamburger-lines span {
+            display:block;width:18px;height:2px;
+            background:var(--text);border-radius:2px;
+            transition:all 0.3s;
+        }
+        .mobile-toggle.active .hamburger-lines span:nth-child(1){transform:rotate(45deg) translateY(4.2px) translateX(4.2px)}
+        .mobile-toggle.active .hamburger-lines span:nth-child(2){opacity:0;transform:translateX(-8px)}
+        .mobile-toggle.active .hamburger-lines span:nth-child(3){transform:rotate(-45deg) translateY(-4.2px) translateX(4.2px)}
+
+        /* sidebar backdrop on mobile */
+        .sidebar-backdrop {
+            display:none;position:fixed;inset:0;
+            background:rgba(0,0,0,0.5);z-index:40;
+            opacity:0;transition:opacity 0.3s;
+        }
+        .sidebar-backdrop.visible{display:block;opacity:1}
+
+        /* ── Scrollbar ────────────────────────────── */
+        ::-webkit-scrollbar{width:6px}
+        ::-webkit-scrollbar-track{background:transparent}
+        ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+        ::-webkit-scrollbar-thumb:hover{background:var(--border-light)}
+
+        /* ── Responsive ────────────────────────────── */
+        @media (max-width:768px) {
+            .sidebar{transform:translateX(-100%)}
+            .sidebar.open{transform:translateX(0)}
+            .main{margin-left:0;padding:24px 16px 40px;padding-top:72px}
+            .mobile-toggle{display:flex}
+            .skills-grid{grid-template-columns:1fr}
+            .modal{padding:24px;max-width:100%;width:96%}
+            .toast-container{top:12px;right:12px;left:12px}
+            .toast{max-width:100%}
+            .page-header{flex-direction:column;gap:12px}
+        }
+        @media (max-width:480px) {
+            .page-header-text h1{font-size:1.5rem}
+            .search-bar{max-width:100%}
+        }
+
+        /* ── Animations ────────────────────────────── */
+        @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+        .fade-up{animation:fadeUp 0.5s ease both}
+        .delay-1{animation-delay:0.05s}
+        .delay-2{animation-delay:0.1s}
+        .delay-3{animation-delay:0.15s}
+        .delay-4{animation-delay:0.2s}
+        .delay-5{animation-delay:0.25s}
+    </style>
+</head>
+<body>
+    <!-- Mobile hamburger toggle -->
+    <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle navigation">
+        <div class="hamburger-lines"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Sidebar backdrop (mobile) -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+    <div class="app">
+        <!-- ─── Sidebar ──────────────────────────── -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <a href="/dashboard" class="logo">
+                    <div class="logo-mark">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="#08090d" stroke-width="2.5" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                    </div>
+                    Runloop
+                </a>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-label">Main</div>
+                    <a href="/dashboard" class="nav-item"><span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>Overview</a>
+                    <a href="/chat" class="nav-item"><span class="icon">💬</span>Chat</a>
+                    <a href="/tasks" class="nav-item"><span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span>Tasks</a>
+                    <a href="/analytics" class="nav-item"><span class="icon">📊</span>Analytics</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-label">Knowledge</div>
+                    <a href="/documents" class="nav-item"><span class="icon">📄</span>Documents</a>
+                    <a href="/memory" class="nav-item"><span class="icon">🧠</span>Memory</a>
+                    <a href="/skills" class="nav-item active"><span class="icon">⚙️</span>Skills</a>
+                    <a href="/learnings" class="nav-item"><span class="icon">💡</span>Learnings</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-label">Automation</div>
+                    <a href="/workflows" class="nav-item"><span class="icon">🔄</span>Workflows</a>
+                    <a href="/email" class="nav-item"><span class="icon">📧</span>Email</a>
+                    <a href="/cycles" class="nav-item"><span class="icon">🌙</span>Cycles</a>
+                    <a href="/reports" class="nav-item"><span class="icon">📋</span>Reports</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-label">Build</div>
+                    <a href="/agent-factory" class="nav-item"><span class="icon">🏭</span>Agent Factory</a>
+                    <a href="/settings" class="nav-item"><span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></span>Settings</a>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-pill" id="userPill" onclick="toggleUserMenu()">
+                    <div class="user-avatar" id="userAvatar">--</div>
+                    <div class="user-info">
+                        <div class="user-name" id="userName">Loading...</div>
+                        <div class="user-email" id="userEmail">...</div>
+                    </div>
+                    <span class="user-menu-toggle">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 15l-6-6-6 6"/></svg>
+                    </span>
+
+                    <div class="user-dropdown" id="userDropdown">
+                        <a href="/settings" class="user-dropdown-item">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9"/></svg>
+                            Settings
+                        </a>
+                        <button class="user-dropdown-item danger" onclick="handleLogout(event)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                            Log out
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ─── Main Content ──────────────────────────── -->
+        <main class="main" id="mainContent">
+            <!-- Page Header -->
+            <div class="page-header fade-up">
+                <div class="page-header-text">
+                    <h1>Skills</h1>
+                    <p>Reusable procedures and established workflows</p>
+                </div>
+                <button class="btn btn-primary" onclick="openCreateModal()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Create Skill
+                </button>
+            </div>
+
+            <!-- Search Bar -->
+            <div class="search-bar fade-up delay-1">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" class="search-input" id="searchInput" placeholder="Search skills by name, keyword, or agent type..." autocomplete="off">
+            </div>
+
+            <!-- Skills Grid -->
+            <div class="skills-grid" id="skillsGrid">
+                <!-- skeleton cards while loading -->
+                <div class="skeleton skeleton-card"></div>
+                <div class="skeleton skeleton-card"></div>
+                <div class="skeleton skeleton-card"></div>
+                <div class="skeleton skeleton-card"></div>
+                <div class="skeleton skeleton-card"></div>
+                <div class="skeleton skeleton-card"></div>
+            </div>
+
+            <!-- Loading spinner for search -->
+            <div class="spinner" id="searchSpinner">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 2a10 10 0 0110 10"/></svg>
+            </div>
+        </main>
+    </div>
+
+    <!-- ─── Detail Modal ──────────────────────────── -->
+    <div class="modal-overlay detail-modal" id="detailModal">
+        <div class="modal">
+            <div class="detail-header">
+                <h2 id="detailTitle">Skill Name</h2>
+                <button class="detail-close" onclick="closeDetailModal()" aria-label="Close">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <p id="detailSummary" style="color:var(--text-dim);font-size:14px;margin-bottom:16px"></p>
+            <div class="detail-meta" id="detailMeta"></div>
+            <div class="detail-divider"></div>
+            <div class="md-content" id="detailContent">
+                <!-- Rendered markdown content -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Create Skill Modal ──────────────────────────── -->
+    <div class="modal-overlay create-modal" id="createModal">
+        <div class="modal">
+            <h2>Create Skill</h2>
+            <p class="modal-sub">Define a new reusable procedure for your agents</p>
+            <form id="createForm" onsubmit="handleCreateSubmit(event)">
+                <div class="form-group">
+                    <label class="form-label" for="skillName">Skill Name</label>
+                    <input type="text" id="skillName" class="form-input" placeholder="e.g. deploy-staging-env" required>
+                    <div class="form-hint">Use kebab-case (lowercase letters, numbers, and hyphens only)</div>
+                    <div class="form-error" id="nameError">Invalid name. Use lowercase letters, numbers, and hyphens only (e.g. my-skill-name)</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="skillSummary">Summary</label>
+                    <input type="text" id="skillSummary" class="form-input" placeholder="Brief one-line description of what this skill does" required maxlength="200">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="skillContent">Content (Markdown)</label>
+                    <textarea id="skillContent" class="form-input" placeholder="## When to Use&#10;Describe the scenarios where this skill applies...&#10;&#10;## Prerequisites&#10;- Requirement 1&#10;- Requirement 2&#10;&#10;## Procedure&#10;1. Step one&#10;2. Step two&#10;&#10;## Common Pitfalls&#10;- Watch out for..." required></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="skillKeywords">Keywords</label>
+                    <input type="text" id="skillKeywords" class="form-input" placeholder="deploy, staging, ci-cd, automation">
+                    <div class="form-hint">Comma-separated keywords to make this skill discoverable</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Agent Types</label>
+                    <div class="checkbox-group" id="agentTypeCheckboxes">
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="agent_types" value="engineering">
+                            <span class="cb-check"><svg viewBox="0 0 24 24" fill="none" stroke="#08090d" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+                            Engineering
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="agent_types" value="research">
+                            <span class="cb-check"><svg viewBox="0 0 24 24" fill="none" stroke="#08090d" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+                            Research
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="agent_types" value="growth">
+                            <span class="cb-check"><svg viewBox="0 0 24 24" fill="none" stroke="#08090d" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+                            Growth
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="agent_types" value="sales">
+                            <span class="cb-check"><svg viewBox="0 0 24 24" fill="none" stroke="#08090d" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+                            Sales
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="agent_types" value="operations">
+                            <span class="cb-check"><svg viewBox="0 0 24 24" fill="none" stroke="#08090d" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+                            Operations
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="agent_types" value="support">
+                            <span class="cb-check"><svg viewBox="0 0 24 24" fill="none" stroke="#08090d" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+                            Support
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeCreateModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="createSubmitBtn">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        Create Skill
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ─── Toast Container ──────────────────────────── -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+    /* ==============================================================
+       State
+       ============================================================== */
+    let currentUser = null;
+    let skills = [];
+    let searchTimeout = null;
+    let isLoading = false;
+
+    const KEBAB_REGEX = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+    /* ==============================================================
+       Helpers
+       ============================================================== */
+    async function apiFetch(url, opts = {}) {
+        const res = await fetch(url, {
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', ...opts.headers },
+            ...opts
+        });
+        if (res.status === 401) {
+            window.location.href = '/login';
+            throw new Error('Unauthorized');
+        }
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Request failed');
+        return data;
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    function getInitials(name) {
+        if (!name) return '?';
+        return name.split(' ').map(function(w) { return w[0]; }).join('').toUpperCase().slice(0, 2);
+    }
+
+    function kebabToTitle(kebab) {
+        if (!kebab) return '';
+        return kebab.split('-').map(function(word) {
+            return word.charAt(0).toUpperCase() + word.slice(1);
+        }).join(' ');
+    }
+
+    function getAgentBadgeClass(agentType) {
+        var known = ['engineering', 'research', 'growth', 'sales', 'operations', 'support', 'pm', 'qa'];
+        return known.indexOf(agentType) !== -1 ? agentType : 'default';
+    }
+
+    /* ==============================================================
+       Simple Markdown Renderer
+       ============================================================== */
+    function renderMarkdown(md) {
+        if (!md) return '';
+        var html = escapeHtml(md);
+
+        // Code blocks (```...```)
+        html = html.replace(/```([^`]*?)```/gs, function(_, code) {
+            return '<pre><code>' + code.trim() + '</code></pre>';
+        });
+
+        // Inline code
+        html = html.replace(/`([^`\n]+?)`/g, '<code>$1</code>');
+
+        // Headings
+        html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+        html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+        html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+        // Horizontal rules
+        html = html.replace(/^---$/gm, '<hr>');
+
+        // Bold and italic
+        html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+        html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+        // Blockquotes
+        html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+
+        // Unordered lists — gather consecutive lines
+        html = html.replace(/(^- .+$(\n- .+$)*)/gm, function(block) {
+            var items = block.split('\n').map(function(line) {
+                return '<li>' + line.replace(/^- /, '') + '</li>';
+            }).join('');
+            return '<ul>' + items + '</ul>';
+        });
+
+        // Ordered lists — gather consecutive lines
+        html = html.replace(/(^\d+\. .+$(\n\d+\. .+$)*)/gm, function(block) {
+            var items = block.split('\n').map(function(line) {
+                return '<li>' + line.replace(/^\d+\. /, '') + '</li>';
+            }).join('');
+            return '<ol>' + items + '</ol>';
+        });
+
+        // Paragraphs — wrap remaining text blocks
+        var lines = html.split('\n');
+        var result = [];
+        var inParagraph = false;
+        var paraLines = [];
+
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].trim();
+            var isBlockElement = /^<(h[1-3]|ul|ol|li|pre|blockquote|hr)/.test(line) ||
+                                 /<\/(h[1-3]|ul|ol|pre|blockquote)>$/.test(line);
+
+            if (line === '') {
+                if (inParagraph && paraLines.length > 0) {
+                    result.push('<p>' + paraLines.join(' ') + '</p>');
+                    paraLines = [];
+                    inParagraph = false;
+                }
+            } else if (isBlockElement) {
+                if (inParagraph && paraLines.length > 0) {
+                    result.push('<p>' + paraLines.join(' ') + '</p>');
+                    paraLines = [];
+                    inParagraph = false;
+                }
+                result.push(line);
+            } else {
+                inParagraph = true;
+                paraLines.push(line);
+            }
+        }
+        if (paraLines.length > 0) {
+            result.push('<p>' + paraLines.join(' ') + '</p>');
+        }
+
+        return result.join('\n');
+    }
+
+    /* ==============================================================
+       Toast System
+       ============================================================== */
+    function showToast(message, type) {
+        type = type || 'success';
+        var container = document.getElementById('toastContainer');
+        var toast = document.createElement('div');
+        toast.className = 'toast ' + type;
+
+        var iconSvg = type === 'success'
+            ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>'
+            : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
+
+        toast.innerHTML =
+            '<span class="toast-icon">' + iconSvg + '</span>' +
+            '<span class="toast-message">' + escapeHtml(message) + '</span>' +
+            '<button class="toast-close" onclick="this.parentElement.remove()" aria-label="Dismiss">&times;</button>';
+
+        container.appendChild(toast);
+
+        requestAnimationFrame(function() {
+            requestAnimationFrame(function() { toast.classList.add('visible'); });
+        });
+
+        setTimeout(function() {
+            toast.classList.remove('visible');
+            setTimeout(function() { toast.remove(); }, 400);
+        }, 4500);
+    }
+
+    /* ==============================================================
+       Detail Modal
+       ============================================================== */
+    function openDetailModal(skillName) {
+        var modal = document.getElementById('detailModal');
+        var titleEl = document.getElementById('detailTitle');
+        var summaryEl = document.getElementById('detailSummary');
+        var metaEl = document.getElementById('detailMeta');
+        var contentEl = document.getElementById('detailContent');
+
+        titleEl.textContent = 'Loading...';
+        summaryEl.textContent = '';
+        metaEl.innerHTML = '';
+        contentEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="animation:spin 1s linear infinite"><path d="M12 2a10 10 0 0110 10"/></svg></div>';
+
+        modal.classList.add('opening');
+        requestAnimationFrame(function() {
+            requestAnimationFrame(function() { modal.classList.add('open'); });
+        });
+
+        apiFetch('/api/skills/' + encodeURIComponent(skillName)).then(function(data) {
+            var skill = data.skill || data;
+
+            titleEl.textContent = kebabToTitle(skill.skill_name);
+
+            summaryEl.textContent = skill.summary || '';
+
+            // Meta: usage + agent badges + keywords
+            var metaHtml = '';
+
+            var usageCount = parseInt(skill.usage_count || 0);
+            metaHtml += '<span class="detail-usage"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg> ' + usageCount + ' uses</span>';
+
+            var agentTypes = skill.agent_types || [];
+            if (typeof agentTypes === 'string') {
+                try { agentTypes = JSON.parse(agentTypes); } catch(e) { agentTypes = agentTypes.split(','); }
+            }
+            agentTypes.forEach(function(t) {
+                t = t.trim();
+                if (t) metaHtml += '<span class="agent-badge ' + getAgentBadgeClass(t) + '">' + escapeHtml(t) + '</span>';
+            });
+
+            var keywords = skill.keywords || [];
+            if (typeof keywords === 'string') {
+                try { keywords = JSON.parse(keywords); } catch(e) { keywords = keywords.split(','); }
+            }
+            keywords.forEach(function(k) {
+                k = k.trim();
+                if (k) metaHtml += '<span class="skill-tag">' + escapeHtml(k) + '</span>';
+            });
+
+            metaEl.innerHTML = metaHtml;
+
+            // Render markdown content
+            contentEl.innerHTML = renderMarkdown(skill.content || 'No content available.');
+        }).catch(function(err) {
+            contentEl.innerHTML = '<p style="color:var(--red)">Failed to load skill details: ' + escapeHtml(err.message) + '</p>';
+        });
+    }
+
+    function closeDetailModal() {
+        var modal = document.getElementById('detailModal');
+        modal.classList.remove('open');
+        setTimeout(function() { modal.classList.remove('opening'); }, 300);
+    }
+
+    /* ==============================================================
+       Create Modal
+       ============================================================== */
+    function openCreateModal() {
+        var modal = document.getElementById('createModal');
+        var form = document.getElementById('createForm');
+        form.reset();
+        document.getElementById('nameError').classList.remove('visible');
+        document.getElementById('createSubmitBtn').disabled = false;
+        document.getElementById('createSubmitBtn').innerHTML =
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Create Skill';
+
+        modal.classList.add('opening');
+        requestAnimationFrame(function() {
+            requestAnimationFrame(function() { modal.classList.add('open'); });
+        });
+        setTimeout(function() { document.getElementById('skillName').focus(); }, 150);
+    }
+
+    function closeCreateModal() {
+        var modal = document.getElementById('createModal');
+        modal.classList.remove('open');
+        setTimeout(function() { modal.classList.remove('opening'); }, 300);
+    }
+
+    function validateSkillName(name) {
+        return KEBAB_REGEX.test(name);
+    }
+
+    async function handleCreateSubmit(e) {
+        e.preventDefault();
+
+        var nameInput = document.getElementById('skillName');
+        var name = nameInput.value.trim().toLowerCase();
+        var summary = document.getElementById('skillSummary').value.trim();
+        var content = document.getElementById('skillContent').value.trim();
+        var keywordsRaw = document.getElementById('skillKeywords').value.trim();
+        var btn = document.getElementById('createSubmitBtn');
+        var nameError = document.getElementById('nameError');
+
+        // Validate name
+        if (!validateSkillName(name)) {
+            nameError.classList.add('visible');
+            nameInput.style.borderColor = 'var(--red)';
+            nameInput.focus();
+            setTimeout(function() {
+                nameInput.style.borderColor = '';
+                nameError.classList.remove('visible');
+            }, 4000);
+            return;
+        }
+        nameError.classList.remove('visible');
+
+        // Collect agent types
+        var agentTypes = [];
+        document.querySelectorAll('input[name="agent_types"]:checked').forEach(function(cb) {
+            agentTypes.push(cb.value);
+        });
+
+        // Parse keywords
+        var keywords = keywordsRaw ? keywordsRaw.split(',').map(function(k) { return k.trim(); }).filter(Boolean) : [];
+
+        btn.disabled = true;
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="animation:spin 1s linear infinite"><path d="M12 2a10 10 0 0110 10"/></svg> Creating...';
+
+        try {
+            await apiFetch('/api/skills', {
+                method: 'POST',
+                body: JSON.stringify({
+                    skill_name: name,
+                    summary: summary,
+                    content: content,
+                    keywords: keywords,
+                    agent_types: agentTypes
+                })
+            });
+            closeCreateModal();
+            showToast('Skill "' + kebabToTitle(name) + '" created successfully');
+            loadSkills();
+        } catch (err) {
+            showToast(err.message || 'Failed to create skill', 'error');
+            btn.disabled = false;
+            btn.innerHTML =
+                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Create Skill';
+        }
+    }
+
+    /* ==============================================================
+       Render Skills Grid
+       ============================================================== */
+    function renderSkills(skillsList) {
+        var grid = document.getElementById('skillsGrid');
+
+        if (!skillsList || skillsList.length === 0) {
+            var query = document.getElementById('searchInput').value.trim();
+            if (query) {
+                grid.innerHTML =
+                    '<div class="empty-state">' +
+                        '<div class="empty-state-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>' +
+                        '<h3>No skills match your search</h3>' +
+                        '<p>Try a different keyword or clear the search to see all skills.</p>' +
+                    '</div>';
+            } else {
+                grid.innerHTML =
+                    '<div class="empty-state">' +
+                        '<div class="empty-state-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>' +
+                        '<h3>No skills yet</h3>' +
+                        '<p>Skills are created as agents discover reusable procedures. You can also create one manually using the button above.</p>' +
+                    '</div>';
+            }
+            return;
+        }
+
+        grid.innerHTML = skillsList.map(function(skill, i) {
+            var displayName = kebabToTitle(skill.skill_name);
+            var summary = escapeHtml(skill.summary || '');
+            var usageCount = parseInt(skill.usage_count || 0);
+
+            // Parse keywords
+            var keywords = skill.keywords || [];
+            if (typeof keywords === 'string') {
+                try { keywords = JSON.parse(keywords); } catch(e) { keywords = keywords.split(','); }
+            }
+            var tagsHtml = keywords.slice(0, 5).map(function(k) {
+                k = (k || '').trim();
+                return k ? '<span class="skill-tag">' + escapeHtml(k) + '</span>' : '';
+            }).join('');
+
+            // Parse agent_types
+            var agentTypes = skill.agent_types || [];
+            if (typeof agentTypes === 'string') {
+                try { agentTypes = JSON.parse(agentTypes); } catch(e) { agentTypes = agentTypes.split(','); }
+            }
+            var agentsHtml = agentTypes.map(function(t) {
+                t = (t || '').trim();
+                return t ? '<span class="agent-badge ' + getAgentBadgeClass(t) + '">' + escapeHtml(t) + '</span>' : '';
+            }).join('');
+
+            var delayClass = 'delay-' + Math.min(i + 1, 5);
+
+            return '<div class="skill-card fade-up ' + delayClass + '" onclick="openDetailModal(\'' + escapeHtml(skill.skill_name) + '\')">' +
+                '<div class="skill-card-header">' +
+                    '<div class="skill-card-title">' + escapeHtml(displayName) + '</div>' +
+                    '<span class="skill-usage"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg> ' + usageCount + '</span>' +
+                '</div>' +
+                '<div class="skill-summary">' + summary + '</div>' +
+                (tagsHtml ? '<div class="skill-tags">' + tagsHtml + '</div>' : '') +
+                (agentsHtml ? '<div class="skill-agents">' + agentsHtml + '</div>' : '') +
+            '</div>';
+        }).join('');
+    }
+
+    /* ==============================================================
+       Data Loading
+       ============================================================== */
+    async function loadUser() {
+        try {
+            var data = await apiFetch('/api/auth/me');
+            currentUser = data.user;
+            document.getElementById('userName').textContent = currentUser.name || 'User';
+            document.getElementById('userEmail').textContent = currentUser.email || '';
+            document.getElementById('userAvatar').textContent = getInitials(currentUser.name || currentUser.email);
+        } catch (err) {
+            console.error('Failed to load user:', err);
+        }
+    }
+
+    async function loadSkills() {
+        isLoading = true;
+        try {
+            var data = await apiFetch('/api/skills');
+            skills = data.skills || data || [];
+            renderSkills(skills);
+        } catch (err) {
+            console.error('Failed to load skills:', err);
+            document.getElementById('skillsGrid').innerHTML =
+                '<div class="empty-state">' +
+                    '<div class="empty-state-icon" style="color:var(--red)"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div>' +
+                    '<h3 style="color:var(--red)">Failed to load skills</h3>' +
+                    '<p>Please check your connection and try refreshing the page.</p>' +
+                '</div>';
+        }
+        isLoading = false;
+    }
+
+    async function searchSkills(query) {
+        if (!query) {
+            renderSkills(skills);
+            return;
+        }
+        document.getElementById('searchSpinner').classList.add('visible');
+        try {
+            var data = await apiFetch('/api/skills/search?q=' + encodeURIComponent(query));
+            var results = data.skills || data || [];
+            renderSkills(results);
+        } catch (err) {
+            console.error('Search failed:', err);
+            // Fall back to client-side filter
+            var q = query.toLowerCase();
+            var filtered = skills.filter(function(s) {
+                var haystack = (
+                    (s.skill_name || '') + ' ' +
+                    (s.summary || '') + ' ' +
+                    (Array.isArray(s.keywords) ? s.keywords.join(' ') : (s.keywords || '')) + ' ' +
+                    (Array.isArray(s.agent_types) ? s.agent_types.join(' ') : (s.agent_types || ''))
+                ).toLowerCase();
+                return haystack.indexOf(q) !== -1;
+            });
+            renderSkills(filtered);
+        }
+        document.getElementById('searchSpinner').classList.remove('visible');
+    }
+
+    /* ==============================================================
+       Search with Debounce
+       ============================================================== */
+    document.getElementById('searchInput').addEventListener('input', function() {
+        var query = this.value.trim();
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(function() {
+            searchSkills(query);
+        }, 300);
+    });
+
+    /* ==============================================================
+       Modal Close Handlers
+       ============================================================== */
+    document.getElementById('detailModal').addEventListener('click', function(e) {
+        if (e.target === this) closeDetailModal();
+    });
+    document.getElementById('createModal').addEventListener('click', function(e) {
+        if (e.target === this) closeCreateModal();
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeDetailModal();
+            closeCreateModal();
+        }
+    });
+
+    /* ==============================================================
+       Skill Name Input — live validation
+       ============================================================== */
+    document.getElementById('skillName').addEventListener('input', function() {
+        var val = this.value.trim().toLowerCase();
+        var nameError = document.getElementById('nameError');
+        if (val && !validateSkillName(val)) {
+            this.style.borderColor = 'var(--red)';
+            nameError.classList.add('visible');
+        } else {
+            this.style.borderColor = '';
+            nameError.classList.remove('visible');
+        }
+    });
+
+    // Auto-lowercase and replace spaces with hyphens
+    document.getElementById('skillName').addEventListener('keyup', function(e) {
+        var pos = this.selectionStart;
+        var val = this.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        if (val !== this.value) {
+            this.value = val;
+            this.selectionStart = this.selectionEnd = Math.min(pos, val.length);
+        }
+    });
+
+    /* ==============================================================
+       Logout
+       ============================================================== */
+    async function handleLogout(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        try {
+            await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
+        } catch (err) {
+            // even on error, redirect
+        }
+        window.location.href = '/login';
+    }
+
+    /* ==============================================================
+       User Menu
+       ============================================================== */
+    function toggleUserMenu() {
+        var pill = document.getElementById('userPill');
+        var dropdown = document.getElementById('userDropdown');
+        var isOpen = dropdown.classList.contains('open');
+        if (isOpen) {
+            dropdown.classList.remove('open');
+            pill.classList.remove('open');
+        } else {
+            dropdown.classList.add('open');
+            pill.classList.add('open');
+        }
+    }
+
+    document.addEventListener('click', function(e) {
+        var pill = document.getElementById('userPill');
+        if (!pill.contains(e.target)) {
+            document.getElementById('userDropdown').classList.remove('open');
+            pill.classList.remove('open');
+        }
+    });
+
+    /* ==============================================================
+       Mobile Sidebar
+       ============================================================== */
+    var mobileToggle = document.getElementById('mobileToggle');
+    var sidebar = document.getElementById('sidebar');
+    var backdrop = document.getElementById('sidebarBackdrop');
+
+    function toggleSidebar() {
+        var isOpen = sidebar.classList.contains('open');
+        if (isOpen) {
+            sidebar.classList.remove('open');
+            backdrop.classList.remove('visible');
+            mobileToggle.classList.remove('active');
+        } else {
+            sidebar.classList.add('open');
+            backdrop.classList.add('visible');
+            mobileToggle.classList.add('active');
+        }
+    }
+
+    mobileToggle.addEventListener('click', toggleSidebar);
+    backdrop.addEventListener('click', toggleSidebar);
+
+    /* ==============================================================
+       Init
+       ============================================================== */
+    (async function init() {
+        await Promise.all([
+            loadUser(),
+            loadSkills()
+        ]);
+    })();
+    </script>
+<script src="/sidebar.js"></script>
+</body>
+</html>

@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Runloop — The Autonomous Operating System for Business</title>
+    <meta name="description" content="Describe what your company does. AI agents handle the rest — engineering, marketing, sales, ops. Your autonomous workforce, running 24/7.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{--bg:#08090d;--surface:#0f1117;--surface-2:#151821;--border:#1a1d27;--border-light:#252838;--text:#e8e9ed;--text-dim:#7a7f8e;--text-muted:#4a4f5e;--accent:#00e599;--accent-dim:rgba(0,229,153,0.12);--accent-glow:rgba(0,229,153,0.25);--warm:#ff6b4a;--purple:#8b5cf6;--blue:#6366f1;--amber:#f59e0b;--red:#ef4444;--cyan:#06b6d4}
+        body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
+        body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0}
+        .container{max-width:1100px;margin:0 auto;padding:0 24px;position:relative;z-index:1}
+        a{color:inherit;text-decoration:none}
+
+        /* NAV */
+        nav{padding:20px 0;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;background:rgba(8,9,13,0.85);backdrop-filter:blur(20px);border-bottom:1px solid transparent}
+        nav.scrolled{border-bottom-color:var(--border)}
+        .logo{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:22px;letter-spacing:-0.5px;display:flex;align-items:center;gap:10px}
+        .logo-mark{width:32px;height:32px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center}
+        .logo-mark svg{width:18px;height:18px}
+        .nav-links{display:flex;align-items:center;gap:32px}
+        .nav-links a{font-size:14px;color:var(--text-dim);transition:color 0.2s}
+        .nav-links a:hover{color:var(--text)}
+        .nav-cta{display:flex;gap:12px;align-items:center}
+        .btn-ghost{padding:8px 16px;border-radius:8px;font-size:14px;font-weight:500;color:var(--text-dim);transition:all 0.2s}
+        .btn-ghost:hover{color:var(--text);background:var(--surface)}
+        .btn-primary{padding:8px 20px;border-radius:8px;font-size:14px;font-weight:600;background:var(--accent);color:#08090d;transition:all 0.2s;border:none;cursor:pointer}
+        .btn-primary:hover{opacity:0.9;transform:translateY(-1px);box-shadow:0 4px 20px var(--accent-glow)}
+        .btn-primary-lg{padding:14px 32px;font-size:16px;border-radius:10px}
+        .btn-outline{padding:14px 32px;border-radius:10px;font-size:16px;font-weight:600;border:1px solid var(--border-light);background:transparent;color:var(--text);cursor:pointer;transition:all 0.2s}
+        .btn-outline:hover{border-color:var(--accent);background:var(--accent-dim)}
+        .hamburger{display:none;flex-direction:column;gap:5px;cursor:pointer;padding:8px}
+        .hamburger span{width:22px;height:2px;background:var(--text);transition:all 0.3s}
+        .mobile-menu{display:none;position:fixed;top:73px;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--border);padding:24px;z-index:99;flex-direction:column;gap:16px}
+        .mobile-menu.open{display:flex}
+        .mobile-menu a{font-size:16px;padding:12px 0;color:var(--text-dim);border-bottom:1px solid var(--border)}
+
+        /* HERO */
+        .hero{padding:100px 0 80px;text-align:center;position:relative}
+        .hero::before{content:'';position:absolute;top:-100px;left:50%;transform:translateX(-50%);width:800px;height:800px;background:radial-gradient(circle,var(--accent-glow) 0%,transparent 70%);opacity:0.15;pointer-events:none}
+        .hero-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:var(--accent-dim);border:1px solid rgba(0,229,153,0.2);border-radius:100px;font-size:13px;font-weight:500;color:var(--accent);margin-bottom:32px}
+        .hero-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+        .hero h1{font-family:'Space Grotesk',sans-serif;font-size:clamp(2.5rem,6vw,4.5rem);font-weight:700;letter-spacing:-2px;line-height:1.1;margin-bottom:24px;max-width:800px;margin-left:auto;margin-right:auto}
+        .hero h1 .gradient{background:linear-gradient(135deg,var(--accent),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+        .hero p{font-size:clamp(1rem,2vw,1.25rem);color:var(--text-dim);max-width:560px;margin:0 auto 40px;line-height:1.7}
+        .hero-actions{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:64px}
+        .hero-social{display:flex;gap:24px;justify-content:center;color:var(--text-muted);font-size:13px}
+        .hero-social span{display:flex;align-items:center;gap:6px}
+
+        /* AGENT SHOWCASE */
+        .showcase{padding:80px 0;position:relative}
+        .showcase::before{content:'';position:absolute;left:0;right:0;top:0;height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent)}
+        .section-label{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:2px;color:var(--accent);margin-bottom:16px}
+        .section-title{font-family:'Space Grotesk',sans-serif;font-size:clamp(1.8rem,4vw,2.8rem);font-weight:700;letter-spacing:-1px;margin-bottom:16px}
+        .section-desc{color:var(--text-dim);font-size:1.05rem;max-width:520px;margin-bottom:48px}
+        .agents-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+        .agent-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;transition:all 0.3s;position:relative;overflow:hidden}
+        .agent-card:hover{border-color:var(--border-light);transform:translateY(-4px);box-shadow:0 12px 40px rgba(0,0,0,0.3)}
+        .agent-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:16px 16px 0 0;opacity:0.8}
+        .agent-card:nth-child(1)::before{background:var(--accent)}
+        .agent-card:nth-child(2)::before{background:var(--blue)}
+        .agent-card:nth-child(3)::before{background:var(--amber)}
+        .agent-card:nth-child(4)::before{background:var(--red)}
+        .agent-card:nth-child(5)::before{background:var(--purple)}
+        .agent-card:nth-child(6)::before{background:var(--cyan)}
+        .agent-icon{font-size:28px;margin-bottom:16px}
+        .agent-card h3{font-family:'Space Grotesk',sans-serif;font-size:1.1rem;font-weight:600;margin-bottom:8px}
+        .agent-card p{color:var(--text-dim);font-size:0.9rem;line-height:1.5}
+        .agent-tools{display:flex;flex-wrap:wrap;gap:6px;margin-top:16px}
+        .agent-tools span{padding:3px 10px;font-size:11px;border-radius:6px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-dim)}
+
+        /* HOW IT WORKS */
+        .how-it-works{padding:80px 0}
+        .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:40px;margin-top:48px}
+        .step{position:relative;padding-left:0}
+        .step-num{font-family:'Space Grotesk',sans-serif;font-size:4rem;font-weight:700;color:var(--accent);opacity:0.15;line-height:1;margin-bottom:12px}
+        .step h3{font-family:'Space Grotesk',sans-serif;font-size:1.2rem;font-weight:600;margin-bottom:8px}
+        .step p{color:var(--text-dim);font-size:0.95rem}
+
+        /* DASHBOARD PREVIEW */
+        .preview{padding:80px 0;text-align:center}
+        .preview-window{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-top:48px;max-width:900px;margin-left:auto;margin-right:auto}
+        .preview-bar{display:flex;align-items:center;gap:8px;padding:14px 20px;border-bottom:1px solid var(--border);background:var(--surface-2)}
+        .preview-dot{width:10px;height:10px;border-radius:50%}
+        .preview-content{padding:32px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+        .preview-stat{padding:20px;background:var(--surface-2);border:1px solid var(--border);border-radius:12px;text-align:left}
+        .preview-stat .label{font-size:12px;color:var(--text-dim);margin-bottom:4px}
+        .preview-stat .value{font-family:'Space Grotesk',sans-serif;font-size:2rem;font-weight:700}
+        .preview-stat .value.green{color:var(--accent)}
+        .preview-stat .value.blue{color:var(--blue)}
+        .preview-stat .value.amber{color:var(--amber)}
+        .preview-agents{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:8px}
+        .preview-agent{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--bg);border:1px solid var(--border);border-radius:10px}
+        .preview-agent .status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+        .preview-agent .name{font-size:13px;font-weight:500}
+        .preview-agent .state{font-size:11px;color:var(--text-dim)}
+
+        /* PRICING */
+        .pricing{padding:80px 0;text-align:center}
+        .pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:48px;max-width:960px;margin-left:auto;margin-right:auto}
+        .price-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:36px 28px;text-align:left;position:relative;transition:all 0.3s}
+        .price-card:hover{transform:translateY(-4px)}
+        .price-card.featured{border-color:var(--accent);box-shadow:0 0 40px var(--accent-dim)}
+        .price-card.featured::before{content:'Most Popular';position:absolute;top:-12px;left:50%;transform:translateX(-50%);padding:4px 16px;background:var(--accent);color:#08090d;font-size:12px;font-weight:700;border-radius:100px}
+        .price-name{font-size:14px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+        .price-amount{font-family:'Space Grotesk',sans-serif;font-size:3rem;font-weight:700;margin-bottom:4px}
+        .price-amount span{font-size:1rem;color:var(--text-dim);font-weight:400}
+        .price-desc{color:var(--text-dim);font-size:0.9rem;margin-bottom:24px;min-height:40px}
+        .price-features{list-style:none;margin-bottom:28px}
+        .price-features li{padding:8px 0;font-size:0.9rem;color:var(--text-dim);display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)}
+        .price-features li::before{content:'✓';color:var(--accent);font-weight:700;font-size:14px}
+        .price-btn{width:100%;padding:12px;border-radius:10px;font-size:14px;font-weight:600;text-align:center;display:block;transition:all 0.2s;cursor:pointer;border:none}
+        .price-btn-primary{background:var(--accent);color:#08090d}
+        .price-btn-primary:hover{opacity:0.9}
+        .price-btn-outline{background:transparent;border:1px solid var(--border-light);color:var(--text)}
+        .price-btn-outline:hover{border-color:var(--accent)}
+
+        /* SOCIAL PROOF */
+        .proof{padding:80px 0;text-align:center}
+        .proof-logos{display:flex;justify-content:center;gap:48px;flex-wrap:wrap;opacity:0.4;margin-top:32px}
+        .proof-logo{font-family:'Space Grotesk',sans-serif;font-size:1.2rem;font-weight:600;color:var(--text-dim)}
+
+        /* CTA */
+        .cta{padding:80px 0;text-align:center}
+        .cta-box{background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:64px 40px;position:relative;overflow:hidden}
+        .cta-box::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at center,var(--accent-dim) 0%,transparent 50%);pointer-events:none}
+        .cta-box h2{font-family:'Space Grotesk',sans-serif;font-size:clamp(1.8rem,4vw,2.5rem);font-weight:700;letter-spacing:-1px;margin-bottom:16px;position:relative}
+        .cta-box p{color:var(--text-dim);font-size:1.1rem;margin-bottom:32px;position:relative}
+
+        /* FOOTER */
+        footer{padding:48px 0;border-top:1px solid var(--border)}
+        .footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px}
+        .footer-brand p{color:var(--text-dim);font-size:0.9rem;margin-top:12px;max-width:280px}
+        .footer-col h4{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);margin-bottom:16px}
+        .footer-col a{display:block;font-size:14px;color:var(--text-muted);padding:4px 0;transition:color 0.2s}
+        .footer-col a:hover{color:var(--text)}
+        .footer-bottom{display:flex;justify-content:space-between;align-items:center;margin-top:40px;padding-top:24px;border-top:1px solid var(--border);color:var(--text-muted);font-size:13px}
+
+        /* RESPONSIVE */
+        @media(max-width:768px){
+            .nav-links{display:none}
+            .nav-cta{display:none}
+            .hamburger{display:flex}
+            .agents-grid{grid-template-columns:1fr}
+            .steps{grid-template-columns:1fr}
+            .pricing-grid{grid-template-columns:1fr}
+            .preview-content{grid-template-columns:1fr}
+            .preview-agents{grid-template-columns:1fr}
+            .footer-grid{grid-template-columns:1fr 1fr}
+            .hero{padding:60px 0 40px}
+            .hero h1{font-size:2.2rem}
+        }
+        @media(max-width:480px){
+            .footer-grid{grid-template-columns:1fr}
+        }
+
+        /* ANIMATIONS */
+        @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+        .fade-up{animation:fadeUp 0.6s ease both}
+        .delay-1{animation-delay:0.1s}
+        .delay-2{animation-delay:0.2s}
+        .delay-3{animation-delay:0.3s}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav id="nav">
+            <a href="/" class="logo">
+                <div class="logo-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#08090d" stroke-width="2.5" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                </div>
+                Runloop
+            </a>
+            <div class="nav-links">
+                <a href="#agents">Agents</a>
+                <a href="#how-it-works">How It Works</a>
+                <a href="/pricing">Pricing</a>
+                <a href="/about">About</a>
+            </div>
+            <div class="nav-cta">
+                <a href="/login" class="btn-ghost">Log in</a>
+                <a href="/signup" class="btn-primary">Get Started</a>
+            </div>
+            <div class="hamburger" onclick="document.querySelector('.mobile-menu').classList.toggle('open')">
+                <span></span><span></span><span></span>
+            </div>
+        </nav>
+    </div>
+    <div class="mobile-menu">
+        <a href="#agents">Agents</a>
+        <a href="#how-it-works">How It Works</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/about">About</a>
+        <a href="/login">Log in</a>
+        <a href="/signup" class="btn-primary" style="text-align:center;margin-top:8px">Get Started</a>
+    </div>
+
+    <!-- HERO -->
+    <section class="hero">
+        <div class="container">
+            <div class="hero-badge fade-up"><span class="dot"></span> Now in public beta</div>
+            <h1 class="fade-up delay-1">Your business runs on<br><span class="gradient">autonomous agents</span></h1>
+            <p class="fade-up delay-2">Describe what your company does. Runloop deploys AI agents that handle engineering, marketing, sales, and operations — coordinating with each other and shipping real work every day.</p>
+            <div class="hero-actions fade-up delay-3">
+                <a href="/signup" class="btn-primary btn-primary-lg">Start Free →</a>
+                <button class="btn-outline" onclick="document.getElementById('preview').scrollIntoView({behavior:'smooth'})">See It In Action</button>
+            </div>
+            <div class="hero-social fade-up delay-3">
+                <span>🔒 No credit card required</span>
+                <span>⚡ Deploy in 2 minutes</span>
+                <span>🤖 6 specialized agents</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- AGENTS -->
+    <section class="showcase" id="agents">
+        <div class="container">
+            <div class="section-label">Your Autonomous Workforce</div>
+            <div class="section-title">Six agents. One mission.</div>
+            <div class="section-desc">Each agent has specialized tools, its own system prompt, and the ability to execute real actions — not just generate text.</div>
+            <div class="agents-grid">
+                <div class="agent-card">
+                    <div class="agent-icon">⚡</div>
+                    <h3>Engineering</h3>
+                    <p>Writes code, fixes bugs, deploys to production. Handles all technical implementation autonomously.</p>
+                    <div class="agent-tools"><span>code_execute</span><span>git_ops</span><span>terminal</span></div>
+                </div>
+                <div class="agent-card">
+                    <div class="agent-icon">🔍</div>
+                    <h3>Research</h3>
+                    <p>Deep competitive analysis, market research, and synthesized reports you can actually use.</p>
+                    <div class="agent-tools"><span>web_search</span><span>summarize</span><span>report</span></div>
+                </div>
+                <div class="agent-card">
+                    <div class="agent-icon">📈</div>
+                    <h3>Growth</h3>
+                    <p>Content creation, social campaigns, email sequences, and audience analysis at scale.</p>
+                    <div class="agent-tools"><span>content_gen</span><span>social</span><span>email</span></div>
+                </div>
+                <div class="agent-card">
+                    <div class="agent-icon">🎯</div>
+                    <h3>Sales</h3>
+                    <p>Finds leads, sends personalized outreach, manages your pipeline, and follows up.</p>
+                    <div class="agent-tools"><span>lead_search</span><span>outreach</span><span>crm</span></div>
+                </div>
+                <div class="agent-card">
+                    <div class="agent-icon">🔧</div>
+                    <h3>Operations</h3>
+                    <p>Monitors services, schedules tasks, manages infrastructure, and keeps everything running.</p>
+                    <div class="agent-tools"><span>monitor</span><span>schedule</span><span>alerts</span></div>
+                </div>
+                <div class="agent-card">
+                    <div class="agent-icon">💬</div>
+                    <h3>Support</h3>
+                    <p>Responds to tickets, searches knowledge bases, analyzes sentiment, and escalates when needed.</p>
+                    <div class="agent-tools"><span>tickets</span><span>kb_search</span><span>escalate</span></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- HOW IT WORKS -->
+    <section class="how-it-works" id="how-it-works">
+        <div class="container">
+            <div class="section-label">How It Works</div>
+            <div class="section-title">Three steps to autonomous</div>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-num">01</div>
+                    <h3>Describe Your Business</h3>
+                    <p>Tell us what your company does, your goals, and your priorities. Our onboarding wizard captures everything.</p>
+                </div>
+                <div class="step">
+                    <div class="step-num">02</div>
+                    <h3>Activate Your Agents</h3>
+                    <p>Pick which agents you need. Each comes pre-configured with specialized tools and system prompts.</p>
+                </div>
+                <div class="step">
+                    <div class="step-num">03</div>
+                    <h3>Watch Them Work</h3>
+                    <p>Your dashboard shows real-time execution. Agents coordinate, complete tasks, and report results.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- DASHBOARD PREVIEW -->
+    <section class="preview" id="preview">
+        <div class="container">
+            <div class="section-label">Live Dashboard</div>
+            <div class="section-title">Real-time visibility into everything</div>
+            <div class="preview-window">
+                <div class="preview-bar">
+                    <div class="preview-dot" style="background:#ff5f57"></div>
+                    <div class="preview-dot" style="background:#febc2e"></div>
+                    <div class="preview-dot" style="background:#28c840"></div>
+                    <span style="font-size:12px;color:var(--text-dim);margin-left:12px">runloop.polsia.app/dashboard</span>
+                </div>
+                <div class="preview-content">
+                    <div class="preview-stat">
+                        <div class="label">Tasks Completed</div>
+                        <div class="value green" id="stat-tasks">47</div>
+                    </div>
+                    <div class="preview-stat">
+                        <div class="label">Active Agents</div>
+                        <div class="value blue">6</div>
+                    </div>
+                    <div class="preview-stat">
+                        <div class="label">Tokens Used</div>
+                        <div class="value amber" id="stat-tokens">24.3K</div>
+                    </div>
+                    <div class="preview-agents">
+                        <div class="preview-agent"><div class="status-dot" style="background:var(--accent)"></div><div><div class="name">⚡ Engineering</div><div class="state">Deploying auth module...</div></div></div>
+                        <div class="preview-agent"><div class="status-dot" style="background:var(--amber)"></div><div><div class="name">📈 Growth</div><div class="state">Writing blog post...</div></div></div>
+                        <div class="preview-agent"><div class="status-dot" style="background:var(--text-dim)"></div><div><div class="name">🎯 Sales</div><div class="state">Idle — 12 tasks done</div></div></div>
+                        <div class="preview-agent"><div class="status-dot" style="background:var(--accent)"></div><div><div class="name">🔍 Research</div><div class="state">Analyzing competitors...</div></div></div>
+                        <div class="preview-agent"><div class="status-dot" style="background:var(--text-dim)"></div><div><div class="name">🔧 Operations</div><div class="state">Idle — monitoring</div></div></div>
+                        <div class="preview-agent"><div class="status-dot" style="background:var(--cyan)"></div><div><div class="name">💬 Support</div><div class="state">Responding to ticket...</div></div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PRICING -->
+    <section class="pricing" id="pricing">
+        <div class="container">
+            <div class="section-label">Pricing</div>
+            <div class="section-title">Start free. Scale when ready.</div>
+            <div class="pricing-grid">
+                <div class="price-card">
+                    <div class="price-name">Free</div>
+                    <div class="price-amount">$0<span>/mo</span></div>
+                    <div class="price-desc">Try Runloop with limited executions</div>
+                    <ul class="price-features">
+                        <li>3 agents</li>
+                        <li>50 tasks/month</li>
+                        <li>Basic dashboard</li>
+                        <li>Community support</li>
+                    </ul>
+                    <a href="/signup" class="price-btn price-btn-outline">Get Started</a>
+                </div>
+                <div class="price-card featured">
+                    <div class="price-name">Pro</div>
+                    <div class="price-amount">$49<span>/mo</span></div>
+                    <div class="price-desc">Full autonomous operations</div>
+                    <ul class="price-features">
+                        <li>All 6 agents</li>
+                        <li>Unlimited tasks</li>
+                        <li>Priority execution</li>
+                        <li>API access</li>
+                        <li>Custom prompts</li>
+                    </ul>
+                    <a href="/signup" class="price-btn price-btn-primary">Start Pro Trial</a>
+                </div>
+                <div class="price-card">
+                    <div class="price-name">Enterprise</div>
+                    <div class="price-amount">Custom</div>
+                    <div class="price-desc">For teams with complex needs</div>
+                    <ul class="price-features">
+                        <li>Dedicated infrastructure</li>
+                        <li>Custom agents</li>
+                        <li>SLA guarantee</li>
+                        <li>White-glove onboarding</li>
+                        <li>SSO & audit logs</li>
+                    </ul>
+                    <a href="mailto:hello@runloop.ai" class="price-btn price-btn-outline">Contact Sales</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta">
+        <div class="container">
+            <div class="cta-box">
+                <h2>Ready to put your business on autopilot?</h2>
+                <p>Join the founders who are running entire companies with AI agents.</p>
+                <a href="/signup" class="btn-primary btn-primary-lg" style="position:relative">Start Building Free →</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer>
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-brand">
+                    <div class="logo">
+                        <div class="logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="#08090d" stroke-width="2.5" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+                        Runloop
+                    </div>
+                    <p>The autonomous operating system for business. AI agents that actually ship work.</p>
+                </div>
+                <div class="footer-col">
+                    <h4>Product</h4>
+                    <a href="#agents">Agents</a>
+                    <a href="/pricing">Pricing</a>
+                    <a href="/dashboard">Dashboard</a>
+                    <a href="#">API Docs</a>
+                </div>
+                <div class="footer-col">
+                    <h4>Company</h4>
+                    <a href="/about">About</a>
+                    <a href="#">Blog</a>
+                    <a href="#">Careers</a>
+                </div>
+                <div class="footer-col">
+                    <h4>Support</h4>
+                    <a href="#">Documentation</a>
+                    <a href="#">Contact</a>
+                    <a href="#">Status</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <span>© 2026 Runloop. All rights reserved.</span>
+                <span>Built with autonomous AI.</span>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+    // Nav scroll effect
+    window.addEventListener('scroll', () => {
+        document.getElementById('nav').classList.toggle('scrolled', window.scrollY > 20);
+    });
+
+    // Animate stats
+    let taskCount = 47;
+    setInterval(() => {
+        if (Math.random() > 0.7) {
+            taskCount++;
+            document.getElementById('stat-tasks').textContent = taskCount;
+        }
+    }, 3000);
+
+    // Polsia Analytics
+    (function() {
+        var slug = 'runloop';
+        if (!slug || slug === '__POLSIA_' + 'SLUG__') return;
+        var vid = localStorage.getItem('polsia_vid');
+        if (!vid) {
+            vid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                var r = Math.random() * 16 | 0;
+                return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+            });
+            localStorage.setItem('polsia_vid', vid);
+        }
+        new Image().src = 'https://polsia.com/api/beacon/pixel?s=' + encodeURIComponent(slug) + '&v=' + encodeURIComponent(vid);
+    })();
+    </script>
+</body>
+</html>

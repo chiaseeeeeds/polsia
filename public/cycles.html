@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cycles — Runloop</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ── Reset & Tokens ────────────────────────────── */
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root {
+            --bg:#08090d;
+            --surface:#0f1117;
+            --surface-2:#151821;
+            --surface-3:#1a1e2a;
+            --border:#1a1d27;
+            --border-light:#252838;
+            --text:#e8e9ed;
+            --text-dim:#7a7f8e;
+            --text-muted:#4a4f5e;
+            --accent:#00e599;
+            --accent-dim:rgba(0,229,153,0.12);
+            --accent-glow:rgba(0,229,153,0.25);
+            --purple:#8b5cf6;
+            --blue:#6366f1;
+            --amber:#f59e0b;
+            --red:#ef4444;
+            --cyan:#06b6d4;
+            --sidebar-w:260px;
+        }
+        body {
+            font-family:'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+            background:var(--bg);
+            color:var(--text);
+            line-height:1.6;
+            overflow-x:hidden;
+        }
+        /* noise overlay */
+        body::before {
+            content:'';position:fixed;top:0;left:0;right:0;bottom:0;
+            background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+            pointer-events:none;z-index:0;
+        }
+        a{color:inherit;text-decoration:none}
+        input,select,textarea,button{font-family:inherit}
+
+        /* ── App Shell ────────────────────────────── */
+        .app{display:flex;min-height:100vh;position:relative;z-index:1}
+
+        /* ── Sidebar ────────────────────────────── */
+        .sidebar {
+            width:var(--sidebar-w);
+            background:var(--surface);
+            border-right:1px solid var(--border);
+            padding:0;
+            display:flex;
+            flex-direction:column;
+            position:fixed;
+            top:0;bottom:0;left:0;
+            z-index:50;
+            transition:transform 0.3s cubic-bezier(.4,0,.2,1);
+        }
+        .sidebar-header {
+            padding:20px 20px 18px;
+            border-bottom:1px solid var(--border);
+        }
+        .logo {
+            font-family:'Space Grotesk',sans-serif;
+            font-weight:700;font-size:20px;letter-spacing:-0.5px;
+            display:flex;align-items:center;gap:10px;
+        }
+        .logo-mark {
+            width:30px;height:30px;border-radius:8px;
+            background:var(--accent);
+            display:flex;align-items:center;justify-content:center;flex-shrink:0;
+        }
+        .logo-mark svg{width:16px;height:16px}
+        .sidebar-nav{flex:1;padding:12px 12px 0;overflow-y:auto}
+        .nav-section{margin-bottom:16px}
+        .nav-section-label {
+            font-size:10px;font-weight:600;
+            text-transform:uppercase;letter-spacing:1.8px;
+            color:var(--text-muted);
+            padding:8px 12px 6px;
+        }
+        .nav-item {
+            display:flex;align-items:center;gap:10px;
+            padding:10px 12px;border-radius:8px;
+            font-size:14px;font-weight:500;color:var(--text-dim);
+            transition:all 0.15s;cursor:pointer;
+        }
+        .nav-item:hover{color:var(--text);background:var(--surface-2)}
+        .nav-item.active{color:var(--accent);background:var(--accent-dim)}
+        .nav-item .icon{width:20px;text-align:center;font-size:15px;flex-shrink:0}
+
+        /* sidebar footer / user pill */
+        .sidebar-footer{padding:12px 16px;border-top:1px solid var(--border)}
+        .user-pill {
+            display:flex;align-items:center;gap:10px;
+            padding:8px 10px;border-radius:10px;
+            transition:background 0.15s;cursor:pointer;
+            position:relative;
+        }
+        .user-pill:hover{background:var(--surface-2)}
+        .user-avatar {
+            width:34px;height:34px;border-radius:8px;
+            background:var(--accent-dim);
+            display:flex;align-items:center;justify-content:center;
+            font-size:14px;font-weight:700;color:var(--accent);flex-shrink:0;
+        }
+        .user-info{flex:1;min-width:0}
+        .user-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .user-email{font-size:11px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .user-menu-toggle{color:var(--text-muted);font-size:16px;flex-shrink:0;transition:transform 0.2s}
+        .user-pill.open .user-menu-toggle{transform:rotate(180deg)}
+
+        /* user dropdown */
+        .user-dropdown {
+            position:absolute;bottom:calc(100% + 8px);left:0;right:0;
+            background:var(--surface-2);
+            border:1px solid var(--border-light);
+            border-radius:10px;
+            padding:6px;
+            display:none;
+            box-shadow:0 -8px 32px rgba(0,0,0,0.4);
+            z-index:60;
+        }
+        .user-dropdown.open{display:block}
+        .user-dropdown-item {
+            display:flex;align-items:center;gap:8px;
+            padding:9px 12px;border-radius:6px;
+            font-size:13px;color:var(--text-dim);
+            cursor:pointer;transition:all 0.12s;border:none;
+            background:none;width:100%;text-align:left;
+        }
+        .user-dropdown-item:hover{background:var(--surface-3);color:var(--text)}
+        .user-dropdown-item.danger{color:var(--red)}
+        .user-dropdown-item.danger:hover{background:rgba(239,68,68,0.08)}
+
+        /* ── Main Content ────────────────────────────── */
+        .main{flex:1;margin-left:var(--sidebar-w);padding:32px 40px 48px;min-height:100vh}
+
+        /* ── Page Header ────────────────────────────── */
+        .page-header{margin-bottom:36px}
+        .page-header h1 {
+            font-family:'Space Grotesk',sans-serif;
+            font-size:1.85rem;font-weight:700;letter-spacing:-0.5px;
+            margin-bottom:4px;
+        }
+        .page-header p{color:var(--text-dim);font-size:0.95rem}
+
+        /* ── Stats Row ────────────────────────────── */
+        .stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px}
+        .stat-card {
+            background:var(--surface);
+            border:1px solid var(--border);
+            border-radius:14px;
+            padding:22px 24px;
+            position:relative;
+            overflow:hidden;
+            transition:all 0.3s;
+            backdrop-filter:blur(12px);
+            background:linear-gradient(135deg, rgba(15,17,23,0.85) 0%, rgba(21,24,33,0.75) 100%);
+        }
+        .stat-card::before {
+            content:'';
+            position:absolute;inset:0;
+            border-radius:14px;
+            padding:1px;
+            background:linear-gradient(135deg, rgba(255,255,255,0.06) 0%, transparent 50%);
+            -webkit-mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite:xor;
+            mask-composite:exclude;
+            pointer-events:none;
+        }
+        .stat-card:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,0.25)}
+        .stat-card .stat-icon {
+            width:36px;height:36px;border-radius:10px;
+            display:flex;align-items:center;justify-content:center;
+            font-size:16px;margin-bottom:14px;
+        }
+        .stat-card .stat-icon.green{background:var(--accent-dim);color:var(--accent)}
+        .stat-card .stat-icon.blue{background:rgba(99,102,241,0.12);color:var(--blue)}
+        .stat-card .stat-icon.amber{background:rgba(245,158,11,0.12);color:var(--amber)}
+        .stat-label {
+            font-size:12px;color:var(--text-dim);
+            text-transform:uppercase;letter-spacing:0.8px;
+            margin-bottom:6px;font-weight:500;
+        }
+        .stat-value {
+            font-family:'JetBrains Mono','Space Grotesk',monospace;
+            font-size:2rem;font-weight:700;line-height:1.1;
+        }
+        .stat-value.green{color:var(--accent)}
+        .stat-value.blue{color:var(--blue)}
+        .stat-value.amber{color:var(--amber)}
+        .stat-sub{font-size:12px;color:var(--text-muted);margin-top:4px}
+        .stat-card::after {
+            content:'';
+            position:absolute;top:-50%;left:-50%;
+            width:200%;height:200%;
+            background:radial-gradient(circle at 30% 30%, rgba(255,255,255,0.03) 0%, transparent 50%);
+            pointer-events:none;
+        }
+
+        /* ── Section Header ────────────────────────────── */
+        .section-header {
+            display:flex;align-items:center;justify-content:space-between;
+            margin-bottom:20px;
+        }
+        .section-header h2 {
+            font-family:'Space Grotesk',sans-serif;
+            font-size:1.15rem;font-weight:600;letter-spacing:-0.3px;
+        }
+
+        /* ── Buttons ────────────────────────────── */
+        .btn{
+            display:inline-flex;align-items:center;justify-content:center;gap:6px;
+            border:none;border-radius:8px;
+            font-size:13px;font-weight:600;
+            cursor:pointer;transition:all 0.2s;
+        }
+        .btn-primary {
+            padding:10px 22px;
+            background:var(--accent);color:#08090d;
+        }
+        .btn-primary:hover{opacity:0.9;box-shadow:0 4px 16px var(--accent-glow)}
+        .btn-primary:disabled{opacity:0.5;cursor:not-allowed;transform:none;box-shadow:none}
+        .btn-secondary {
+            padding:10px 22px;
+            background:var(--surface-2);color:var(--text);
+            border:1px solid var(--border);
+        }
+        .btn-secondary:hover{border-color:var(--border-light)}
+        .btn-sm{padding:7px 14px;font-size:12px}
+
+        /* ── Tonight's Plan Card ────────────────────────────── */
+        .plan-card {
+            background:var(--surface);
+            border:1px solid var(--border);
+            border-radius:16px;
+            padding:28px;
+            margin-bottom:32px;
+            position:relative;
+            overflow:hidden;
+        }
+        .plan-card::before {
+            content:'';position:absolute;top:0;left:0;right:0;height:3px;
+            background:linear-gradient(90deg, var(--accent), var(--cyan));
+            border-radius:16px 16px 0 0;
+        }
+        .plan-card-header {
+            display:flex;align-items:center;justify-content:space-between;
+            margin-bottom:20px;
+        }
+        .plan-card-title {
+            font-family:'Space Grotesk',sans-serif;
+            font-size:1.1rem;font-weight:600;
+            display:flex;align-items:center;gap:10px;
+        }
+        .plan-card-title .moon{font-size:20px;opacity:0.7}
+        .plan-task-list{list-style:none;margin:0;padding:0}
+        .plan-task-item {
+            display:flex;align-items:center;gap:12px;
+            padding:12px 16px;
+            border-radius:10px;
+            background:var(--surface-2);
+            margin-bottom:8px;
+            transition:background 0.15s;
+        }
+        .plan-task-item:last-child{margin-bottom:0}
+        .plan-task-item:hover{background:var(--surface-3)}
+        .plan-task-number {
+            width:24px;height:24px;border-radius:6px;
+            background:var(--accent-dim);color:var(--accent);
+            display:flex;align-items:center;justify-content:center;
+            font-family:'JetBrains Mono',monospace;
+            font-size:11px;font-weight:700;flex-shrink:0;
+        }
+        .plan-task-content{flex:1;min-width:0}
+        .plan-task-title{font-size:14px;font-weight:500}
+        .plan-task-agent{font-size:12px;color:var(--text-dim);margin-top:2px}
+        .plan-empty {
+            text-align:center;padding:36px 20px;color:var(--text-muted);
+        }
+        .plan-empty-icon{font-size:40px;margin-bottom:12px;opacity:0.35}
+        .plan-empty h3 {
+            font-family:'Space Grotesk',sans-serif;
+            color:var(--text-dim);font-size:1rem;font-weight:600;margin-bottom:6px;
+        }
+        .plan-empty p{font-size:13px}
+        .plan-reasoning {
+            margin-top:16px;padding:14px 16px;
+            background:var(--surface-2);border-radius:10px;
+            border-left:3px solid var(--accent);
+        }
+        .plan-reasoning-label{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px}
+        .plan-reasoning-text{font-size:13px;color:var(--text-dim);line-height:1.6}
+
+        /* ── Cycle History Cards ────────────────────────────── */
+        .cycle-card {
+            background:var(--surface);
+            border:1px solid var(--border);
+            border-radius:16px;
+            margin-bottom:12px;
+            overflow:hidden;
+            transition:all 0.3s;
+        }
+        .cycle-card:hover{border-color:var(--border-light)}
+        .cycle-card-header {
+            display:flex;align-items:center;gap:14px;
+            padding:20px 24px;
+            cursor:pointer;
+            transition:background 0.15s;
+        }
+        .cycle-card-header:hover{background:var(--surface-2)}
+        .cycle-date-col{flex-shrink:0;min-width:0}
+        .cycle-date {
+            font-family:'Space Grotesk',sans-serif;
+            font-size:15px;font-weight:600;
+        }
+        .cycle-date-sub{font-size:12px;color:var(--text-muted);margin-top:1px}
+        .cycle-meta{flex:1;display:flex;align-items:center;gap:16px;flex-wrap:wrap;min-width:0}
+        .cycle-counts{display:flex;gap:14px;font-size:12px;color:var(--text-dim)}
+        .cycle-counts span{display:flex;align-items:center;gap:4px;white-space:nowrap}
+        .cycle-counts .ct-green{color:var(--accent)}
+        .cycle-counts .ct-red{color:var(--red)}
+        .cycle-counts .ct-total{color:var(--text-dim)}
+        .cycle-expand-icon {
+            flex-shrink:0;color:var(--text-muted);
+            transition:transform 0.3s cubic-bezier(.4,0,.2,1);
+        }
+        .cycle-card.expanded .cycle-expand-icon{transform:rotate(180deg)}
+
+        /* Status badge */
+        .status-badge {
+            display:inline-flex;align-items:center;gap:5px;
+            font-size:11px;font-weight:600;
+            padding:4px 10px;border-radius:100px;
+            text-transform:capitalize;
+            flex-shrink:0;
+        }
+        .status-badge.planning{background:rgba(99,102,241,0.12);color:var(--blue)}
+        .status-badge.executing{background:rgba(245,158,11,0.12);color:var(--amber)}
+        .status-badge.completed{background:rgba(0,229,153,0.12);color:var(--accent)}
+        .status-badge.failed{background:rgba(239,68,68,0.12);color:var(--red)}
+        .status-badge .pulse-dot {
+            width:6px;height:6px;border-radius:50%;
+            animation:pulse-status 1.5s ease-in-out infinite;
+        }
+        .status-badge.executing .pulse-dot{background:var(--amber)}
+        .status-badge.planning .pulse-dot{background:var(--blue)}
+        @keyframes pulse-status{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.35;transform:scale(0.8)}}
+
+        /* Cycle detail body */
+        .cycle-body {
+            max-height:0;overflow:hidden;
+            transition:max-height 0.4s cubic-bezier(.4,0,.2,1), padding 0.3s;
+            padding:0 24px;
+        }
+        .cycle-card.expanded .cycle-body{max-height:2000px;padding:0 24px 24px}
+
+        .cycle-section{margin-bottom:20px}
+        .cycle-section:last-child{margin-bottom:0}
+        .cycle-section-label {
+            font-size:11px;font-weight:600;color:var(--text-muted);
+            text-transform:uppercase;letter-spacing:0.8px;
+            margin-bottom:10px;
+        }
+
+        /* Review summary */
+        .cycle-summary {
+            font-size:14px;color:var(--text-dim);line-height:1.7;
+            padding:14px 16px;background:var(--surface-2);border-radius:10px;
+        }
+
+        /* Result items (accomplished/failed/blocked) */
+        .result-list{list-style:none;margin:0;padding:0}
+        .result-item {
+            display:flex;align-items:flex-start;gap:10px;
+            padding:8px 0;font-size:13px;line-height:1.5;
+        }
+        .result-item + .result-item{border-top:1px solid var(--border)}
+        .result-dot {
+            width:8px;height:8px;border-radius:50%;
+            flex-shrink:0;margin-top:6px;
+        }
+        .result-dot.green{background:var(--accent)}
+        .result-dot.red{background:var(--red)}
+        .result-dot.amber{background:var(--amber)}
+        .result-text{color:var(--text-dim)}
+        .result-text.green{color:var(--accent)}
+        .result-text.red{color:var(--red)}
+        .result-text.amber{color:var(--amber)}
+
+        /* Tomorrow priorities */
+        .priority-list{list-style:none;margin:0;padding:0}
+        .priority-item {
+            display:flex;align-items:center;gap:8px;
+            padding:6px 0;font-size:13px;color:var(--text-dim);
+        }
+        .priority-item::before {
+            content:'';display:inline-block;
+            width:5px;height:5px;border-radius:50%;
+            background:var(--cyan);flex-shrink:0;
+        }
+
+        /* History empty */
+        .history-empty {
+            text-align:center;padding:56px 24px;
+            background:var(--surface);border:1px solid var(--border);
+            border-radius:16px;
+        }
+        .history-empty-icon{font-size:48px;margin-bottom:16px;opacity:0.3}
+        .history-empty h3 {
+            font-family:'Space Grotesk',sans-serif;
+            font-size:1.05rem;font-weight:600;color:var(--text);margin-bottom:8px;
+        }
+        .history-empty p{font-size:14px;color:var(--text-muted);max-width:380px;margin:0 auto;line-height:1.6}
+
+        /* ── Toast Notification System ────────────────────────────── */
+        .toast-container {
+            position:fixed;top:24px;right:24px;z-index:2000;
+            display:flex;flex-direction:column;gap:10px;
+            pointer-events:none;
+        }
+        .toast {
+            pointer-events:auto;
+            background:var(--surface);
+            border:1px solid var(--border);
+            border-radius:12px;
+            padding:14px 20px;
+            font-size:14px;font-weight:500;
+            display:flex;align-items:center;gap:10px;
+            box-shadow:0 12px 40px rgba(0,0,0,0.35);
+            transform:translateX(120%);
+            opacity:0;
+            transition:all 0.4s cubic-bezier(.4,0,.2,1);
+            max-width:380px;
+        }
+        .toast.visible{transform:translateX(0);opacity:1}
+        .toast.success{border-left:3px solid var(--accent)}
+        .toast.success .toast-icon{color:var(--accent)}
+        .toast.error{border-left:3px solid var(--red)}
+        .toast.error .toast-icon{color:var(--red)}
+        .toast-icon{font-size:18px;flex-shrink:0}
+        .toast-message{flex:1;color:var(--text)}
+        .toast-close {
+            background:none;border:none;color:var(--text-muted);
+            cursor:pointer;font-size:16px;padding:2px;
+            transition:color 0.15s;flex-shrink:0;
+        }
+        .toast-close:hover{color:var(--text)}
+
+        /* ── Mobile Hamburger ────────────────────────────── */
+        .mobile-toggle {
+            display:none;
+            position:fixed;top:16px;left:16px;z-index:60;
+            width:42px;height:42px;
+            background:var(--surface);
+            border:1px solid var(--border);
+            border-radius:10px;
+            align-items:center;justify-content:center;
+            cursor:pointer;
+            transition:all 0.2s;
+        }
+        .mobile-toggle:hover{background:var(--surface-2)}
+        .hamburger-lines{display:flex;flex-direction:column;gap:4px}
+        .hamburger-lines span {
+            display:block;width:18px;height:2px;
+            background:var(--text);border-radius:2px;
+            transition:all 0.3s;
+        }
+        .mobile-toggle.active .hamburger-lines span:nth-child(1){transform:rotate(45deg) translateY(4.2px) translateX(4.2px)}
+        .mobile-toggle.active .hamburger-lines span:nth-child(2){opacity:0;transform:translateX(-8px)}
+        .mobile-toggle.active .hamburger-lines span:nth-child(3){transform:rotate(-45deg) translateY(-4.2px) translateX(4.2px)}
+
+        /* sidebar backdrop on mobile */
+        .sidebar-backdrop {
+            display:none;position:fixed;inset:0;
+            background:rgba(0,0,0,0.5);z-index:40;
+            opacity:0;transition:opacity 0.3s;
+        }
+        .sidebar-backdrop.visible{display:block;opacity:1}
+
+        /* ── Loading Skeleton ────────────────────────────── */
+        .skeleton {
+            background:linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%);
+            background-size:200% 100%;
+            animation:shimmer 1.5s ease-in-out infinite;
+            border-radius:8px;
+        }
+        @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+        .skeleton-text{height:14px;margin-bottom:8px}
+        .skeleton-title{height:24px;width:60%;margin-bottom:12px}
+        .skeleton-stat{height:40px;width:80px}
+        .skeleton-card{height:180px;border-radius:16px}
+
+        /* ── Scrollbar ────────────────────────────── */
+        ::-webkit-scrollbar{width:6px}
+        ::-webkit-scrollbar-track{background:transparent}
+        ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+        ::-webkit-scrollbar-thumb:hover{background:var(--border-light)}
+
+        /* ── Loading Spinner ────────────────────────────── */
+        @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+        .spinner{animation:spin 1s linear infinite}
+
+        /* ── Responsive ────────────────────────────── */
+        @media (max-width:768px) {
+            .sidebar{transform:translateX(-100%)}
+            .sidebar.open{transform:translateX(0)}
+            .main{margin-left:0;padding:24px 16px 40px;padding-top:72px}
+            .mobile-toggle{display:flex}
+            .stats-row{grid-template-columns:1fr}
+            .toast-container{top:12px;right:12px;left:12px}
+            .toast{max-width:100%}
+            .plan-card{padding:20px}
+            .cycle-card-header{padding:16px;gap:10px;flex-wrap:wrap}
+            .cycle-body{padding:0 16px}
+            .cycle-card.expanded .cycle-body{padding:0 16px 20px}
+        }
+        @media (max-width:480px) {
+            .page-header h1{font-size:1.5rem}
+            .stat-value{font-size:1.65rem}
+            .plan-card-header{flex-direction:column;align-items:flex-start;gap:12px}
+        }
+
+        /* ── Animations ────────────────────────────── */
+        @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+        .fade-up{animation:fadeUp 0.5s ease both}
+        .delay-1{animation-delay:0.05s}
+        .delay-2{animation-delay:0.1s}
+        .delay-3{animation-delay:0.15s}
+        .delay-4{animation-delay:0.2s}
+        .delay-5{animation-delay:0.25s}
+    </style>
+</head>
+<body>
+    <!-- Mobile hamburger toggle -->
+    <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle navigation">
+        <div class="hamburger-lines"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Sidebar backdrop (mobile) -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+    <div class="app">
+        <!-- ─── Sidebar ──────────────────────────── -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <a href="/dashboard" class="logo">
+                    <div class="logo-mark">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="#08090d" stroke-width="2.5" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                    </div>
+                    Runloop
+                </a>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-label">Main</div>
+                    <a href="/dashboard" class="nav-item"><span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>Overview</a>
+                    <a href="/chat" class="nav-item"><span class="icon">💬</span>Chat</a>
+                    <a href="/tasks" class="nav-item"><span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span>Tasks</a>
+                    <a href="/analytics" class="nav-item"><span class="icon">📊</span>Analytics</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-label">Knowledge</div>
+                    <a href="/documents" class="nav-item"><span class="icon">📄</span>Documents</a>
+                    <a href="/memory" class="nav-item"><span class="icon">🧠</span>Memory</a>
+                    <a href="/skills" class="nav-item"><span class="icon">⚙️</span>Skills</a>
+                    <a href="/learnings" class="nav-item"><span class="icon">💡</span>Learnings</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-label">Automation</div>
+                    <a href="/workflows" class="nav-item"><span class="icon">🔄</span>Workflows</a>
+                    <a href="/email" class="nav-item"><span class="icon">📧</span>Email</a>
+                    <a href="/cycles" class="nav-item active"><span class="icon">🌙</span>Cycles</a>
+                    <a href="/reports" class="nav-item"><span class="icon">📋</span>Reports</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-label">Build</div>
+                    <a href="/agent-factory" class="nav-item"><span class="icon">🏭</span>Agent Factory</a>
+                    <a href="/settings" class="nav-item"><span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></span>Settings</a>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-pill" id="userPill" onclick="toggleUserMenu()">
+                    <div class="user-avatar" id="userAvatar">--</div>
+                    <div class="user-info">
+                        <div class="user-name" id="userName">Loading...</div>
+                        <div class="user-email" id="userEmail">...</div>
+                    </div>
+                    <span class="user-menu-toggle">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 15l-6-6-6 6"/></svg>
+                    </span>
+
+                    <div class="user-dropdown" id="userDropdown">
+                        <a href="/settings" class="user-dropdown-item">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9"/></svg>
+                            Settings
+                        </a>
+                        <button class="user-dropdown-item danger" onclick="handleLogout(event)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                            Log out
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ─── Main Content ──────────────────────────── -->
+        <main class="main" id="mainContent">
+            <!-- Page Header -->
+            <div class="page-header fade-up">
+                <h1>Cycles</h1>
+                <p>Autonomous nightly execution engine</p>
+            </div>
+
+            <!-- Stats Row -->
+            <div class="stats-row" id="statsRow">
+                <div class="stat-card fade-up delay-1">
+                    <div class="stat-icon green">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a10 10 0 0 1 10 10 10 10 0 0 1-10 10A10 10 0 0 1 2 12 10 10 0 0 1 12 2z"/><path d="M12 6v6l4 2"/></svg>
+                    </div>
+                    <div class="stat-label">Total Cycles</div>
+                    <div class="stat-value green" id="statTotalCycles">
+                        <span class="skeleton skeleton-stat" style="display:inline-block;width:48px;height:36px"></span>
+                    </div>
+                    <div class="stat-sub" id="statTotalCyclesSub">Loading...</div>
+                </div>
+                <div class="stat-card fade-up delay-2">
+                    <div class="stat-icon blue">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+                    </div>
+                    <div class="stat-label">Avg Tasks / Cycle</div>
+                    <div class="stat-value blue" id="statAvgTasks">
+                        <span class="skeleton skeleton-stat" style="display:inline-block;width:48px;height:36px"></span>
+                    </div>
+                    <div class="stat-sub" id="statAvgTasksSub">Loading...</div>
+                </div>
+                <div class="stat-card fade-up delay-3">
+                    <div class="stat-icon amber">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    </div>
+                    <div class="stat-label">Success Rate</div>
+                    <div class="stat-value amber" id="statSuccessRate">
+                        <span class="skeleton skeleton-stat" style="display:inline-block;width:64px;height:36px"></span>
+                    </div>
+                    <div class="stat-sub" id="statSuccessRateSub">Loading...</div>
+                </div>
+            </div>
+
+            <!-- Tonight's Plan -->
+            <div class="section-header fade-up delay-3">
+                <h2>&#x1F319; Tonight's Plan</h2>
+            </div>
+            <div class="plan-card fade-up delay-4" id="planCard">
+                <div class="plan-card-header">
+                    <div class="plan-card-title">
+                        <span class="moon">&#x1F319;</span>
+                        <span id="planTitle">Loading...</span>
+                    </div>
+                    <button class="btn btn-primary btn-sm" id="runNowBtn" onclick="handleRunNow()" style="display:none">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                        Run Now
+                    </button>
+                </div>
+                <div id="planContent">
+                    <div style="padding:20px 0;text-align:center">
+                        <div class="skeleton skeleton-text" style="width:70%;margin:0 auto 8px"></div>
+                        <div class="skeleton skeleton-text" style="width:50%;margin:0 auto"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cycle History -->
+            <div class="section-header fade-up delay-4" style="display:flex;justify-content:space-between;align-items:center">
+                <h2>Cycle History</h2>
+                <button class="btn btn-primary btn-sm" id="triggerCycleBtn" onclick="handleTriggerCycle()" style="font-size:13px">⚡ Trigger Cycle Now</button>
+            </div>
+            <div id="cycleHistory" class="fade-up delay-5">
+                <div class="skeleton skeleton-card" style="margin-bottom:12px"></div>
+                <div class="skeleton skeleton-card" style="margin-bottom:12px"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ─── Toast Container ──────────────────────────── -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+    /* ======================================================
+       State
+       ====================================================== */
+    let currentUser = null;
+    let cycles = [];
+    let latestCycle = null;
+
+    /* ======================================================
+       Helpers
+       ====================================================== */
+    async function apiFetch(url, opts = {}) {
+        const res = await fetch(url, {
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', ...opts.headers },
+            ...opts
+        });
+        if (res.status === 401) {
+            window.location.href = '/login';
+            throw new Error('Unauthorized');
+        }
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Request failed');
+        return data;
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    function getInitials(name) {
+        if (!name) return '?';
+        return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    }
+
+    function formatDate(dateStr) {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function formatTime(dateStr) {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    }
+
+    function timeAgo(dateStr) {
+        if (!dateStr) return '';
+        const now = new Date();
+        const date = new Date(dateStr);
+        const diffMs = now - date;
+        const diffS = Math.floor(diffMs / 1000);
+        const diffM = Math.floor(diffS / 60);
+        const diffH = Math.floor(diffM / 60);
+        const diffD = Math.floor(diffH / 24);
+
+        if (diffS < 10) return 'just now';
+        if (diffS < 60) return diffS + 's ago';
+        if (diffM < 60) return diffM + 'm ago';
+        if (diffH < 24) return diffH + 'h ago';
+        if (diffD < 7) return diffD + 'd ago';
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+
+    function statusBadgeHtml(status) {
+        const s = (status || 'planning').toLowerCase();
+        const labels = { planning: 'Planning', executing: 'Executing', completed: 'Completed', failed: 'Failed' };
+        const label = labels[s] || s;
+        const hasPulse = s === 'executing' || s === 'planning';
+        const pulse = hasPulse ? '<span class="pulse-dot"></span>' : '';
+        return '<span class="status-badge ' + s + '">' + pulse + ' ' + label + '</span>';
+    }
+
+    /* ======================================================
+       Toast System
+       ====================================================== */
+    function showToast(message, type) {
+        type = type || 'success';
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = 'toast ' + type;
+
+        const iconSvg = type === 'success'
+            ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>'
+            : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
+
+        toast.innerHTML =
+            '<span class="toast-icon">' + iconSvg + '</span>' +
+            '<span class="toast-message">' + escapeHtml(message) + '</span>' +
+            '<button class="toast-close" onclick="this.parentElement.remove()" aria-label="Dismiss">&times;</button>';
+
+        container.appendChild(toast);
+        requestAnimationFrame(function() {
+            requestAnimationFrame(function() { toast.classList.add('visible'); });
+        });
+        setTimeout(function() {
+            toast.classList.remove('visible');
+            setTimeout(function() { toast.remove(); }, 400);
+        }, 4500);
+    }
+
+    /* ======================================================
+       User Menu
+       ====================================================== */
+    function toggleUserMenu() {
+        var pill = document.getElementById('userPill');
+        var dropdown = document.getElementById('userDropdown');
+        var isOpen = dropdown.classList.contains('open');
+        if (isOpen) {
+            dropdown.classList.remove('open');
+            pill.classList.remove('open');
+        } else {
+            dropdown.classList.add('open');
+            pill.classList.add('open');
+        }
+    }
+
+    document.addEventListener('click', function(e) {
+        var pill = document.getElementById('userPill');
+        if (!pill.contains(e.target)) {
+            document.getElementById('userDropdown').classList.remove('open');
+            pill.classList.remove('open');
+        }
+    });
+
+    async function handleLogout(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        try {
+            await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
+        } catch (err) { /* redirect anyway */ }
+        window.location.href = '/login';
+    }
+
+    /* ======================================================
+       Mobile Sidebar
+       ====================================================== */
+    var mobileToggle = document.getElementById('mobileToggle');
+    var sidebar = document.getElementById('sidebar');
+    var backdrop = document.getElementById('sidebarBackdrop');
+
+    function toggleSidebar() {
+        var isOpen = sidebar.classList.contains('open');
+        if (isOpen) {
+            sidebar.classList.remove('open');
+            backdrop.classList.remove('visible');
+            mobileToggle.classList.remove('active');
+        } else {
+            sidebar.classList.add('open');
+            backdrop.classList.add('visible');
+            mobileToggle.classList.add('active');
+        }
+    }
+
+    mobileToggle.addEventListener('click', toggleSidebar);
+    backdrop.addEventListener('click', toggleSidebar);
+
+    /* ======================================================
+       Data Loading
+       ====================================================== */
+    async function loadUser() {
+        try {
+            var data = await apiFetch('/api/auth/me');
+            currentUser = data.user;
+            document.getElementById('userName').textContent = currentUser.name || 'User';
+            document.getElementById('userEmail').textContent = currentUser.email || '';
+            document.getElementById('userAvatar').textContent = getInitials(currentUser.name || currentUser.email);
+        } catch (err) {
+            console.error('Failed to load user:', err);
+        }
+    }
+
+    async function loadCycles() {
+        try {
+            var data = await apiFetch('/api/cycles');
+            cycles = data.cycles || [];
+            renderStats();
+            renderHistory();
+        } catch (err) {
+            console.error('Failed to load cycles:', err);
+            cycles = [];
+            renderStats();
+            renderHistory();
+        }
+    }
+
+    async function loadLatestCycle() {
+        try {
+            var data = await apiFetch('/api/cycles/latest');
+            latestCycle = data.cycle || null;
+            renderPlan();
+        } catch (err) {
+            console.error('Failed to load latest cycle:', err);
+            latestCycle = null;
+            renderPlan();
+        }
+    }
+
+    /* ======================================================
+       Render: Stats
+       ====================================================== */
+    function renderStats() {
+        var total = cycles.length;
+        var completed = cycles.filter(function(c) { return c.status === 'completed'; }).length;
+        var failed = cycles.filter(function(c) { return c.status === 'failed'; }).length;
+
+        // Total cycles
+        document.getElementById('statTotalCycles').textContent = total;
+        document.getElementById('statTotalCyclesSub').textContent = completed + ' completed, ' + failed + ' failed';
+
+        // Avg tasks per cycle
+        var totalTasks = 0;
+        cycles.forEach(function(c) {
+            totalTasks += parseInt(c.tasks_created || 0);
+        });
+        var avg = total > 0 ? (totalTasks / total).toFixed(1) : '0';
+        document.getElementById('statAvgTasks').textContent = avg;
+        document.getElementById('statAvgTasksSub').textContent = totalTasks + ' total tasks created';
+
+        // Success rate
+        var completedOrFailed = completed + failed;
+        var rate = completedOrFailed > 0 ? Math.round((completed / completedOrFailed) * 100) : 0;
+        document.getElementById('statSuccessRate').textContent = rate + '%';
+        document.getElementById('statSuccessRateSub').textContent = completed + ' of ' + completedOrFailed + ' cycles succeeded';
+    }
+
+    /* ======================================================
+       Render: Tonight's Plan
+       ====================================================== */
+    function renderPlan() {
+        var planContent = document.getElementById('planContent');
+        var planTitle = document.getElementById('planTitle');
+        var runNowBtn = document.getElementById('runNowBtn');
+
+        if (!latestCycle || latestCycle.status === 'completed' || latestCycle.status === 'failed') {
+            // No active plan
+            planTitle.textContent = 'Next Cycle';
+            runNowBtn.style.display = 'none';
+            planContent.innerHTML =
+                '<div class="plan-empty">' +
+                    '<div class="plan-empty-icon">&#x1F319;</div>' +
+                    '<h3>No cycle planned for tonight</h3>' +
+                    '<p>Your next cycle will be planned and executed automatically at the configured time.</p>' +
+                '</div>';
+            return;
+        }
+
+        // There is an active or planned cycle
+        var cycle = latestCycle;
+        planTitle.textContent = 'Cycle ' + formatDate(cycle.created_at);
+
+        // Show "Run Now" only for planned cycles
+        if (cycle.status === 'planning') {
+            runNowBtn.style.display = 'inline-flex';
+        } else {
+            runNowBtn.style.display = 'none';
+        }
+
+        var tasks = [];
+        try { tasks = JSON.parse(cycle.planned_tasks || '[]'); } catch(e) { tasks = []; }
+        if (!Array.isArray(tasks)) tasks = [];
+
+        var html = '';
+
+        // Status line
+        html += '<div style="margin-bottom:16px">' + statusBadgeHtml(cycle.status) + '</div>';
+
+        if (tasks.length > 0) {
+            html += '<ul class="plan-task-list">';
+            tasks.forEach(function(task, i) {
+                var title = typeof task === 'string' ? task : (task.title || task.description || 'Task ' + (i+1));
+                var agent = typeof task === 'object' && task.agent ? task.agent : '';
+                html +=
+                    '<li class="plan-task-item">' +
+                        '<span class="plan-task-number">' + (i + 1) + '</span>' +
+                        '<div class="plan-task-content">' +
+                            '<div class="plan-task-title">' + escapeHtml(title) + '</div>' +
+                            (agent ? '<div class="plan-task-agent">Assigned to: ' + escapeHtml(agent) + '</div>' : '') +
+                        '</div>' +
+                    '</li>';
+            });
+            html += '</ul>';
+        } else {
+            html += '<div style="padding:12px 0;color:var(--text-muted);font-size:13px">No tasks planned yet.</div>';
+        }
+
+        // Plan reasoning
+        if (cycle.plan_reasoning) {
+            html +=
+                '<div class="plan-reasoning">' +
+                    '<div class="plan-reasoning-label">Reasoning</div>' +
+                    '<div class="plan-reasoning-text">' + escapeHtml(cycle.plan_reasoning) + '</div>' +
+                '</div>';
+        }
+
+        planContent.innerHTML = html;
+    }
+
+    /* ======================================================
+       Render: Cycle History
+       ====================================================== */
+    function renderHistory() {
+        var container = document.getElementById('cycleHistory');
+
+        // Filter out the latest active cycle if it's the same one shown in "Tonight's Plan"
+        var historyCycles = cycles.filter(function(c) {
+            if (latestCycle && c.id === latestCycle.id && (c.status === 'planning' || c.status === 'executing')) {
+                return false;
+            }
+            return true;
+        });
+
+        if (historyCycles.length === 0) {
+            container.innerHTML =
+                '<div class="history-empty">' +
+                    '<div class="history-empty-icon">&#x1F504;</div>' +
+                    '<h3>No cycles yet</h3>' +
+                    '<p>Your first cycle will run automatically tonight. Cycles execute tasks autonomously while you sleep.</p>' +
+                '</div>';
+            return;
+        }
+
+        // Sort by created_at descending
+        historyCycles.sort(function(a, b) {
+            return new Date(b.created_at) - new Date(a.created_at);
+        });
+
+        container.innerHTML = historyCycles.map(function(cycle) {
+            var tasksCreated = parseInt(cycle.tasks_created || 0);
+            var tasksCompleted = parseInt(cycle.tasks_completed || 0);
+            var tasksFailed = parseInt(cycle.tasks_failed || 0);
+
+            // Parse review data
+            var review = {};
+            try { review = JSON.parse(cycle.review_data || '{}'); } catch(e) { review = {}; }
+            if (!review || typeof review !== 'object') review = {};
+
+            var accomplished = review.accomplished || [];
+            var failedItems = review.failed || [];
+            var blocked = review.blocked || [];
+            var tomorrowPriorities = review.tomorrow_priorities || [];
+            var summary = review.summary || cycle.review_summary || '';
+
+            // Build expandable body
+            var bodyHtml = '';
+
+            // Summary section
+            if (summary) {
+                bodyHtml +=
+                    '<div class="cycle-section">' +
+                        '<div class="cycle-section-label">Review Summary</div>' +
+                        '<div class="cycle-summary">' + escapeHtml(summary) + '</div>' +
+                    '</div>';
+            }
+
+            // Accomplished
+            if (accomplished.length > 0) {
+                bodyHtml +=
+                    '<div class="cycle-section">' +
+                        '<div class="cycle-section-label">Accomplished</div>' +
+                        '<ul class="result-list">' +
+                            accomplished.map(function(item) {
+                                return '<li class="result-item"><span class="result-dot green"></span><span class="result-text green">' + escapeHtml(item) + '</span></li>';
+                            }).join('') +
+                        '</ul>' +
+                    '</div>';
+            }
+
+            // Failed
+            if (failedItems.length > 0) {
+                bodyHtml +=
+                    '<div class="cycle-section">' +
+                        '<div class="cycle-section-label">Failed</div>' +
+                        '<ul class="result-list">' +
+                            failedItems.map(function(item) {
+                                return '<li class="result-item"><span class="result-dot red"></span><span class="result-text red">' + escapeHtml(item) + '</span></li>';
+                            }).join('') +
+                        '</ul>' +
+                    '</div>';
+            }
+
+            // Blocked
+            if (blocked.length > 0) {
+                bodyHtml +=
+                    '<div class="cycle-section">' +
+                        '<div class="cycle-section-label">Blocked</div>' +
+                        '<ul class="result-list">' +
+                            blocked.map(function(item) {
+                                return '<li class="result-item"><span class="result-dot amber"></span><span class="result-text amber">' + escapeHtml(item) + '</span></li>';
+                            }).join('') +
+                        '</ul>' +
+                    '</div>';
+            }
+
+            // Tomorrow priorities
+            if (tomorrowPriorities.length > 0) {
+                bodyHtml +=
+                    '<div class="cycle-section">' +
+                        '<div class="cycle-section-label">Tomorrow Priorities</div>' +
+                        '<ul class="priority-list">' +
+                            tomorrowPriorities.map(function(item) {
+                                return '<li class="priority-item">' + escapeHtml(item) + '</li>';
+                            }).join('') +
+                        '</ul>' +
+                    '</div>';
+            }
+
+            // If no expandable content at all, show a minimal note
+            if (!bodyHtml) {
+                bodyHtml = '<div style="padding:4px 0;color:var(--text-muted);font-size:13px">No review data available for this cycle.</div>';
+            }
+
+            return (
+                '<div class="cycle-card" data-cycle-id="' + cycle.id + '">' +
+                    '<div class="cycle-card-header" onclick="toggleCycleCard(this)">' +
+                        '<div class="cycle-date-col">' +
+                            '<div class="cycle-date">' + escapeHtml(formatDate(cycle.created_at)) + '</div>' +
+                            '<div class="cycle-date-sub">' + escapeHtml(formatTime(cycle.created_at)) + '</div>' +
+                        '</div>' +
+                        '<div class="cycle-meta">' +
+                            statusBadgeHtml(cycle.status) +
+                            '<div class="cycle-counts">' +
+                                '<span class="ct-total">' + tasksCreated + ' created</span>' +
+                                '<span class="ct-green">' + tasksCompleted + ' completed</span>' +
+                                '<span class="ct-red">' + tasksFailed + ' failed</span>' +
+                            '</div>' +
+                        '</div>' +
+                        '<span class="cycle-expand-icon">' +
+                            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>' +
+                        '</span>' +
+                    '</div>' +
+                    '<div class="cycle-body">' + bodyHtml + '</div>' +
+                '</div>'
+            );
+        }).join('');
+    }
+
+    /* ======================================================
+       Expand / Collapse Cycle Card
+       ====================================================== */
+    function toggleCycleCard(headerEl) {
+        var card = headerEl.closest('.cycle-card');
+        card.classList.toggle('expanded');
+    }
+
+    /* ======================================================
+       Run Now
+       ====================================================== */
+    async function handleTriggerCycle() {
+        var btn = document.getElementById('triggerCycleBtn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Planning...'; }
+        try {
+            var result = await apiFetch('/api/cycles/trigger', { method: 'POST' });
+            showToast('Cycle created: ' + (result.tasks_created || 0) + ' tasks planned');
+            await Promise.all([loadCycles(), loadLatestCycle()]);
+        } catch (err) {
+            showToast(err.message || 'Failed to trigger cycle', 'error');
+        }
+        if (btn) { btn.disabled = false; btn.textContent = '⚡ Trigger Cycle Now'; }
+    }
+
+    async function handleRunNow() {
+        if (!latestCycle || !latestCycle.id) return;
+
+        var btn = document.getElementById('runNowBtn');
+        btn.disabled = true;
+        btn.innerHTML =
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" class="spinner"><path d="M12 2a10 10 0 0 1 10 10"/></svg>' +
+            ' Executing...';
+
+        try {
+            await apiFetch('/api/cycles/' + latestCycle.id + '/execute', {
+                method: 'POST'
+            });
+            showToast('Cycle execution started');
+            // Reload data
+            await Promise.all([loadCycles(), loadLatestCycle()]);
+        } catch (err) {
+            showToast(err.message || 'Failed to start cycle execution', 'error');
+            btn.disabled = false;
+            btn.innerHTML =
+                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>' +
+                ' Run Now';
+        }
+    }
+
+    /* ======================================================
+       Init
+       ====================================================== */
+    (async function init() {
+        await Promise.all([
+            loadUser(),
+            loadCycles(),
+            loadLatestCycle()
+        ]);
+    })();
+    </script>
+<script src="/sidebar.js"></script>
+</body>
+</html>

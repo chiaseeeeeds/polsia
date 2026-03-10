@@ -1,0 +1,42 @@
+[
+  {
+    "content": "Assess existing codebase (server.js routes, DB schema, HTML pages)",
+    "status": "completed",
+    "activeForm": "Assessing existing codebase"
+  },
+  {
+    "content": "Create analytics.html with Chart.js charts (real DB data)",
+    "status": "completed",
+    "activeForm": "Creating analytics page with charts"
+  },
+  {
+    "content": "Create tasks.html, reports.html, email.html, workflows.html, agent-factory.html",
+    "status": "completed",
+    "activeForm": "Creating remaining new pages"
+  },
+  {
+    "content": "Update server.js: add routes + enhance analytics API",
+    "status": "completed",
+    "activeForm": "Updating server.js routes and APIs"
+  },
+  {
+    "content": "Update sidebar nav on ALL existing pages + enhance settings",
+    "status": "completed",
+    "activeForm": "Updating sidebar navigation"
+  },
+  {
+    "content": "Deploy Phase 1 and verify",
+    "status": "in_progress",
+    "activeForm": "Deploying Phase 1 and verifying"
+  },
+  {
+    "content": "Enhance settings page (billing, notifications, cycle config tabs)",
+    "status": "pending",
+    "activeForm": "Enhancing settings page"
+  },
+  {
+    "content": "Final UI polish + push",
+    "status": "pending",
+    "activeForm": "Final UI polish and deployment"
+  }
+]

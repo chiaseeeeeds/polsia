@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings — Runloop</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{--bg:#08090d;--surface:#0f1117;--surface-2:#151821;--border:#1a1d27;--border-light:#252838;--text:#e8e9ed;--text-dim:#7a7f8e;--text-muted:#4a4f5e;--accent:#00e599;--accent-dim:rgba(0,229,153,0.12);--accent-glow:rgba(0,229,153,0.25);--warm:#ff6b4a;--purple:#8b5cf6;--blue:#6366f1;--amber:#f59e0b;--red:#ef4444;--cyan:#06b6d4}
+        body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden;display:flex;min-height:100vh}
+        a{color:inherit;text-decoration:none}
+
+        /* SIDEBAR */
+        .sidebar{width:260px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100}
+        .sidebar-logo{padding:24px 24px 20px;display:flex;align-items:center;gap:10px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px;letter-spacing:-0.5px;border-bottom:1px solid var(--border)}
+        .logo-mark{width:32px;height:32px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .logo-mark svg{width:18px;height:18px}
+        .sidebar-nav{flex:1;padding:16px 12px;display:flex;flex-direction:column;gap:4px}
+        .nav-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;font-size:14px;font-weight:500;color:var(--text-dim);transition:all 0.2s;cursor:pointer}
+        .nav-item:hover{background:var(--surface-2);color:var(--text)}
+        .nav-item.active{background:var(--accent-dim);color:var(--accent)}
+        .nav-item svg{width:18px;height:18px;flex-shrink:0}
+        .sidebar-user{padding:16px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px}
+        .user-avatar{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--purple),var(--blue));display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0}
+        .user-info{flex:1;min-width:0}
+        .user-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .user-email{font-size:11px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .user-status{width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0}
+
+        /* MAIN */
+        .main{flex:1;margin-left:260px;min-height:100vh}
+        .topbar{padding:20px 40px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+        .topbar h1{font-family:'Space Grotesk',sans-serif;font-size:1.5rem;font-weight:700;letter-spacing:-0.5px}
+        .topbar-desc{font-size:14px;color:var(--text-dim)}
+        .content{padding:32px 40px}
+
+        /* TABS */
+        .tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:32px}
+        .tab{padding:12px 20px;font-size:14px;font-weight:500;color:var(--text-dim);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.2s;position:relative;top:1px}
+        .tab:hover{color:var(--text)}
+        .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+        .tab-panel{display:none}
+        .tab-panel.active{display:block}
+
+        /* FORM ELEMENTS */
+        .form-group{margin-bottom:24px;max-width:480px}
+        .form-label{display:block;font-size:13px;font-weight:600;color:var(--text-dim);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px}
+        .form-input{width:100%;padding:10px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;transition:border-color 0.2s;outline:none}
+        .form-input:focus{border-color:var(--accent)}
+        .form-input:read-only{opacity:0.5;cursor:not-allowed}
+        .form-input::placeholder{color:var(--text-muted)}
+        select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237a7f8e' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;cursor:pointer}
+        select.form-input option{background:var(--surface-2);color:var(--text)}
+        textarea.form-input{resize:vertical;min-height:80px}
+
+        .btn{padding:10px 24px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:none;transition:all 0.2s;font-family:'DM Sans',sans-serif}
+        .btn-primary{background:var(--accent);color:#08090d}
+        .btn-primary:hover{opacity:0.9;transform:translateY(-1px);box-shadow:0 4px 20px var(--accent-glow)}
+        .btn-secondary{background:var(--surface-2);border:1px solid var(--border-light);color:var(--text)}
+        .btn-secondary:hover{border-color:var(--accent);background:var(--accent-dim)}
+        .btn-danger{background:rgba(239,68,68,0.12);color:var(--red);border:1px solid rgba(239,68,68,0.2)}
+        .btn-danger:hover{background:rgba(239,68,68,0.2)}
+        .btn-sm{padding:6px 14px;font-size:12px;border-radius:8px}
+        .form-actions{margin-top:32px;display:flex;gap:12px;align-items:center}
+        .form-hint{font-size:12px;color:var(--text-muted);margin-top:6px}
+        .save-status{font-size:13px;color:var(--accent);opacity:0;transition:opacity 0.3s}
+        .save-status.show{opacity:1}
+
+        /* API KEYS TABLE */
+        .keys-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+        .keys-header h3{font-family:'Space Grotesk',sans-serif;font-size:1.1rem;font-weight:600}
+        .keys-table{width:100%;border-collapse:collapse}
+        .keys-table th{text-align:left;padding:10px 16px;font-size:12px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);background:var(--surface-2)}
+        .keys-table td{padding:14px 16px;font-size:14px;border-bottom:1px solid var(--border)}
+        .keys-table tr:hover td{background:var(--surface-2)}
+        .key-prefix{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:6px;display:inline-block}
+        .key-date{color:var(--text-dim);font-size:13px}
+        .keys-empty{text-align:center;padding:48px 20px;color:var(--text-dim);font-size:14px}
+        .keys-empty svg{margin-bottom:12px;opacity:0.3}
+
+        /* NEW KEY MODAL */
+        .modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(8,9,13,0.8);backdrop-filter:blur(8px);z-index:1000;align-items:center;justify-content:center}
+        .modal-overlay.open{display:flex}
+        .modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px;width:100%;max-width:480px;position:relative}
+        .modal h3{font-family:'Space Grotesk',sans-serif;font-size:1.2rem;font-weight:600;margin-bottom:8px}
+        .modal p{color:var(--text-dim);font-size:14px;margin-bottom:20px}
+        .modal-close{position:absolute;top:16px;right:16px;background:none;border:none;color:var(--text-dim);cursor:pointer;padding:4px}
+        .modal-close:hover{color:var(--text)}
+        .key-display{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--accent);display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;word-break:break-all}
+        .key-display .copy-btn{flex-shrink:0;background:var(--accent-dim);border:1px solid rgba(0,229,153,0.2);border-radius:6px;color:var(--accent);padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.2s}
+        .key-display .copy-btn:hover{background:rgba(0,229,153,0.2)}
+        .key-warning{display:flex;align-items:flex-start;gap:10px;padding:12px 16px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:10px;font-size:13px;color:var(--amber);margin-bottom:20px}
+        .key-warning svg{flex-shrink:0;margin-top:1px}
+
+        /* TOGGLE SWITCHES */
+        .toggle-list{display:flex;flex-direction:column;gap:4px;max-width:480px}
+        .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:16px 0;border-bottom:1px solid var(--border)}
+        .toggle-row:last-child{border-bottom:none}
+        .toggle-label{font-size:14px;font-weight:500}
+        .toggle-desc{font-size:12px;color:var(--text-dim);margin-top:2px}
+        .toggle{position:relative;width:44px;height:24px;flex-shrink:0}
+        .toggle input{opacity:0;width:0;height:0}
+        .toggle-track{position:absolute;inset:0;background:var(--surface-2);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:all 0.3s}
+        .toggle-track::before{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;background:var(--text-dim);border-radius:50%;transition:all 0.3s}
+        .toggle input:checked+.toggle-track{background:var(--accent-dim);border-color:var(--accent)}
+        .toggle input:checked+.toggle-track::before{transform:translateX(20px);background:var(--accent)}
+
+        /* BILLING */
+        .plan-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px;max-width:480px;position:relative;overflow:hidden}
+        .plan-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--text-dim)}
+        .plan-badge{display:inline-block;padding:4px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:100px;font-size:11px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:16px}
+        .plan-name{font-family:'Space Grotesk',sans-serif;font-size:1.6rem;font-weight:700;margin-bottom:4px}
+        .plan-price{font-family:'Space Grotesk',sans-serif;font-size:2.5rem;font-weight:700;margin-bottom:4px}
+        .plan-price span{font-size:1rem;color:var(--text-dim);font-weight:400}
+        .plan-desc{color:var(--text-dim);font-size:14px;margin-bottom:20px}
+        .plan-features{list-style:none;margin-bottom:24px}
+        .plan-features li{padding:6px 0;font-size:14px;color:var(--text-dim);display:flex;align-items:center;gap:10px}
+        .plan-features li::before{content:'';display:inline-block;width:16px;height:16px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2300e599' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6L9 17l-5-5'/%3E%3C/svg%3E") no-repeat center;flex-shrink:0}
+        .plan-divider{height:1px;background:var(--border);margin:24px 0}
+        .upgrade-section{max-width:480px;margin-top:24px}
+        .upgrade-section p{color:var(--text-dim);font-size:14px;margin-bottom:16px}
+
+        /* RESPONSIVE */
+        @media(max-width:768px){
+            .sidebar{width:64px}
+            .sidebar-logo span,.nav-item span,.user-info,.user-status{display:none}
+            .sidebar-logo{padding:16px;justify-content:center}
+            .nav-item{justify-content:center;padding:10px}
+            .sidebar-user{justify-content:center;padding:12px}
+            .main{margin-left:64px}
+            .topbar,.content{padding-left:20px;padding-right:20px}
+        }
+    </style>
+</head>
+<body>
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <a href="/" class="sidebar-logo">
+            <div class="logo-mark">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#08090d" stroke-width="2.5" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            </div>
+            <span>Runloop</span>
+        </a>
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-section-label">Main</div>
+                <a href="/dashboard" class="nav-item"><span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>Overview</a>
+                <a href="/chat" class="nav-item"><span class="icon">💬</span>Chat</a>
+                <a href="/tasks" class="nav-item"><span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span>Tasks</a>
+                <a href="/analytics" class="nav-item"><span class="icon">📊</span>Analytics</a>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-label">Knowledge</div>
+                <a href="/documents" class="nav-item"><span class="icon">📄</span>Documents</a>
+                <a href="/memory" class="nav-item"><span class="icon">🧠</span>Memory</a>
+                <a href="/skills" class="nav-item"><span class="icon">⚙️</span>Skills</a>
+                <a href="/learnings" class="nav-item"><span class="icon">💡</span>Learnings</a>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-label">Automation</div>
+                <a href="/workflows" class="nav-item"><span class="icon">🔄</span>Workflows</a>
+                <a href="/email" class="nav-item"><span class="icon">📧</span>Email</a>
+                <a href="/cycles" class="nav-item"><span class="icon">🌙</span>Cycles</a>
+                <a href="/reports" class="nav-item"><span class="icon">📋</span>Reports</a>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-label">Build</div>
+                <a href="/agent-factory" class="nav-item"><span class="icon">🏭</span>Agent Factory</a>
+                <a href="/settings" class="nav-item active"><span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></span>Settings</a>
+            </div>
+        </nav>
+        <div class="sidebar-user">
+            <div class="user-avatar">...</div>
+            <div class="user-info">
+                <div class="user-name">Loading...</div>
+                <div class="user-email">&nbsp;</div>
+            </div>
+            <div class="user-status"></div>
+        </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+        <div class="topbar">
+            <div>
+                <h1>Settings</h1>
+                <div class="topbar-desc">Manage your account, company, and integrations</div>
+            </div>
+        </div>
+        <div class="content">
+            <!-- TABS -->
+            <div class="tabs">
+                <div class="tab active" data-tab="account">Account</div>
+                <div class="tab" data-tab="company">Company</div>
+                <div class="tab" data-tab="agents">Agents</div>
+                <div class="tab" data-tab="apikeys">API Keys</div>
+                <div class="tab" data-tab="notifications">Notifications</div>
+                <div class="tab" data-tab="integrations">Integrations</div>
+                <div class="tab" data-tab="cycle">Cycle</div>
+                <div class="tab" data-tab="billing">Billing</div>
+            </div>
+
+            <!-- ACCOUNT TAB -->
+            <div class="tab-panel active" id="panel-account">
+                <div class="form-group">
+                    <label class="form-label">Full Name</label>
+                    <input type="text" class="form-input" id="account-name" value="" placeholder="Your full name">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <input type="email" class="form-input" id="account-email" value="" readonly>
+                    <div class="form-hint">Contact support to change your email address.</div>
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-primary" onclick="saveProfile()">Save Changes</button>
+                    <span class="save-status" id="account-status">Saved successfully</span>
+                </div>
+            </div>
+
+            <!-- COMPANY TAB -->
+            <div class="tab-panel" id="panel-company">
+                <div class="form-group">
+                    <label class="form-label">Company Name</label>
+                    <input type="text" class="form-input" id="company-name" placeholder="Acme Corp">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-input" id="company-desc" placeholder="Briefly describe what your company does..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Industry</label>
+                    <select class="form-input" id="company-industry">
+                        <option value="">Select an industry</option>
+                        <option value="saas">SaaS / Software</option>
+                        <option value="ecommerce">E-Commerce</option>
+                        <option value="fintech">Fintech</option>
+                        <option value="healthcare">Healthcare</option>
+                        <option value="education">Education</option>
+                        <option value="media">Media / Entertainment</option>
+                        <option value="consulting">Consulting / Services</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Company Size</label>
+                    <select class="form-input" id="company-size">
+                        <option value="">Select company size</option>
+                        <option value="solo">Solo Founder</option>
+                        <option value="2-10">2-10 employees</option>
+                        <option value="11-50">11-50 employees</option>
+                        <option value="51-200">51-200 employees</option>
+                        <option value="200+">200+ employees</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-primary" onclick="saveCompany()">Save Changes</button>
+                    <span class="save-status" id="company-status">Saved successfully</span>
+                </div>
+            </div>
+
+            <!-- AGENTS TAB -->
+            <div class="tab-panel" id="panel-agents">
+                <div class="keys-header">
+                    <h3>Manage Agents</h3>
+                    <a href="/agent-factory" class="btn btn-primary btn-sm">+ Create Agent</a>
+                </div>
+                <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden">
+                    <table class="keys-table" id="agents-table">
+                        <thead><tr><th>Agent</th><th>Type</th><th>Tasks</th><th>Status</th><th></th></tr></thead>
+                        <tbody id="agents-body"></tbody>
+                    </table>
+                    <div class="keys-empty" id="agents-empty" style="display:none">
+                        <div>No agents found. <a href="/agent-factory" style="color:var(--accent)">Create one</a></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CYCLE TAB -->
+            <div class="tab-panel" id="panel-cycle">
+                <div class="form-group">
+                    <label class="form-label">Nightly Cycle Time</label>
+                    <input type="time" class="form-input" id="cycle-time" value="23:30" style="max-width:200px">
+                    <div class="form-hint">When the autonomous nightly cycle runs (in your timezone)</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Cycle Frequency</label>
+                    <select class="form-input" id="cycle-frequency" style="max-width:280px">
+                        <option value="daily">Daily</option>
+                        <option value="weekdays">Weekdays Only</option>
+                        <option value="weekly">Weekly</option>
+                    </select>
+                </div>
+                <div class="toggle-list">
+                    <div class="toggle-row">
+                        <div>
+                            <div class="toggle-label">Enable Nightly Cycles</div>
+                            <div class="toggle-desc">Agents will autonomously plan and execute tasks each night</div>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="cycle-enabled" checked>
+                            <div class="toggle-track"></div>
+                        </label>
+                    </div>
+                    <div class="toggle-row">
+                        <div>
+                            <div class="toggle-label">Cycle Summary Email</div>
+                            <div class="toggle-desc">Receive a summary email after each cycle completes</div>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="cycle-summary-email" checked>
+                            <div class="toggle-track"></div>
+                        </label>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-primary" onclick="saveCycleConfig()">Save Cycle Settings</button>
+                    <span class="save-status" id="cycle-status">Saved successfully</span>
+                </div>
+            </div>
+
+            <!-- API KEYS TAB -->
+            <div class="tab-panel" id="panel-apikeys">
+                <div class="keys-header">
+                    <h3>API Keys</h3>
+                    <button class="btn btn-primary btn-sm" onclick="openNewKeyModal()">
+                        <span style="margin-right:4px">+</span> Generate New Key
+                    </button>
+                </div>
+                <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden">
+                    <table class="keys-table" id="keys-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Key</th>
+                                <th>Created</th>
+                                <th>Last Used</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="keys-body">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                    <div class="keys-empty" id="keys-empty" style="display:none">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+                        <div>No API keys yet. Generate one to get started.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NOTIFICATIONS TAB -->
+            <div class="tab-panel" id="panel-notifications">
+                <div class="toggle-list">
+                    <div class="toggle-row">
+                        <div>
+                            <div class="toggle-label">Email Notifications</div>
+                            <div class="toggle-desc">Receive important updates and alerts via email</div>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" checked>
+                            <div class="toggle-track"></div>
+                        </label>
+                    </div>
+                    <div class="toggle-row">
+                        <div>
+                            <div class="toggle-label">Task Completions</div>
+                            <div class="toggle-desc">Get notified when agents complete assigned tasks</div>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" checked>
+                            <div class="toggle-track"></div>
+                        </label>
+                    </div>
+                    <div class="toggle-row">
+                        <div>
+                            <div class="toggle-label">Agent Errors</div>
+                            <div class="toggle-desc">Receive alerts when an agent encounters an error or fails</div>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" checked>
+                            <div class="toggle-track"></div>
+                        </label>
+                    </div>
+                    <div class="toggle-row">
+                        <div>
+                            <div class="toggle-label">Weekly Digest</div>
+                            <div class="toggle-desc">Summary of agent activity and task completions each week</div>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox">
+                            <div class="toggle-track"></div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- INTEGRATIONS TAB -->
+            <div class="tab-panel" id="panel-integrations">
+                <h3 style="font-family:'Space Grotesk',sans-serif;font-size:1.1rem;font-weight:600;margin-bottom:6px">Connected Services</h3>
+                <p style="color:var(--text-dim);font-size:14px;margin-bottom:24px">Services that power your agents. Green = connected, red = needs setup.</p>
+                <div id="integrations-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">
+                    <div style="text-align:center;padding:40px;color:var(--text-dim)">Loading...</div>
+                </div>
+            </div>
+
+            <!-- BILLING TAB -->
+            <div class="tab-panel" id="panel-billing">
+                <div class="plan-card">
+                    <div class="plan-badge">Current Plan</div>
+                    <div class="plan-name">Free</div>
+                    <div class="plan-price">$0<span>/month</span></div>
+                    <div class="plan-desc">You're on the free tier with limited agent access and task executions.</div>
+                    <ul class="plan-features">
+                        <li>3 agents</li>
+                        <li>50 tasks per month</li>
+                        <li>Basic dashboard</li>
+                        <li>Community support</li>
+                        <li>7-day log retention</li>
+                    </ul>
+                </div>
+                <div class="upgrade-section">
+                    <div class="plan-divider"></div>
+                    <p>Unlock all 6 agents, unlimited tasks, API access, custom prompts, and priority support by upgrading to Pro.</p>
+                    <a href="/pricing" class="btn btn-primary" style="display:inline-block">Upgrade to Pro</a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- NEW KEY MODAL - Generate -->
+    <div class="modal-overlay" id="modal-generate">
+        <div class="modal">
+            <button class="modal-close" onclick="closeModals()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+            <h3>Generate New API Key</h3>
+            <p>Give your key a name so you can identify it later.</p>
+            <div class="form-group" style="margin-bottom:20px">
+                <label class="form-label">Key Name</label>
+                <input type="text" class="form-input" id="new-key-name" placeholder="e.g. Production, Staging, CI/CD">
+            </div>
+            <div style="display:flex;gap:12px;justify-content:flex-end">
+                <button class="btn btn-secondary" onclick="closeModals()">Cancel</button>
+                <button class="btn btn-primary" onclick="generateKey()">Generate Key</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NEW KEY MODAL - Display -->
+    <div class="modal-overlay" id="modal-show-key">
+        <div class="modal">
+            <button class="modal-close" onclick="closeModals()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+            <h3>Your New API Key</h3>
+            <p>Copy this key now. You won't be able to see it again.</p>
+            <div class="key-display">
+                <span id="generated-key-value"></span>
+                <button class="copy-btn" onclick="copyKey()">Copy</button>
+            </div>
+            <div class="key-warning">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                <span>This key will only be shown once. If you lose it, you'll need to generate a new one.</span>
+            </div>
+            <div style="display:flex;justify-content:flex-end">
+                <button class="btn btn-primary" onclick="closeModals()">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // Tab switching
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            tab.classList.add('active');
+            document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+        });
+    });
+
+    // API: Save profile
+    async function saveProfile() {
+        const name = document.getElementById('account-name').value;
+        try {
+            const res = await fetch('/api/settings/profile', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            });
+            if (res.ok) showStatus('account-status');
+        } catch (e) {
+            console.error('Failed to save profile:', e);
+        }
+    }
+
+    // API: Save company
+    async function saveCompany() {
+        const data = {
+            name: document.getElementById('company-name').value,
+            description: document.getElementById('company-desc').value,
+            industry: document.getElementById('company-industry').value,
+            size: document.getElementById('company-size').value
+        };
+        try {
+            const res = await fetch('/api/settings/company', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (res.ok) showStatus('company-status');
+        } catch (e) {
+            console.error('Failed to save company:', e);
+        }
+    }
+
+    function showStatus(id) {
+        const el = document.getElementById(id);
+        el.classList.add('show');
+        setTimeout(() => el.classList.remove('show'), 2500);
+    }
+
+    // API KEYS
+    let apiKeys = [];
+
+    async function loadKeys() {
+        try {
+            const res = await fetch('/api/settings/api-keys');
+            if (res.ok) {
+                const data = await res.json();
+                apiKeys = (data.keys || data || []).map(k => ({
+                    id: String(k.id),
+                    name: k.name,
+                    prefix: k.prefix,
+                    created: k.created_at ? new Date(k.created_at).toLocaleDateString() : '-',
+                    lastUsed: k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : 'Never'
+                }));
+                renderKeys();
+            }
+        } catch (e) {
+            console.error('Failed to load API keys:', e);
+            apiKeys = [];
+            renderKeys();
+        }
+    }
+
+    function renderKeys() {
+        const tbody = document.getElementById('keys-body');
+        const empty = document.getElementById('keys-empty');
+        if (apiKeys.length === 0) {
+            tbody.innerHTML = '';
+            empty.style.display = 'block';
+            document.getElementById('keys-table').querySelector('thead').style.display = 'none';
+            return;
+        }
+        empty.style.display = 'none';
+        document.getElementById('keys-table').querySelector('thead').style.display = '';
+        tbody.innerHTML = apiKeys.map(k => `
+            <tr>
+                <td style="font-weight:500">${k.name}</td>
+                <td><span class="key-prefix">${k.prefix}</span></td>
+                <td><span class="key-date">${k.created}</span></td>
+                <td><span class="key-date">${k.lastUsed || 'Never'}</span></td>
+                <td style="text-align:right">
+                    <button class="btn btn-danger btn-sm" onclick="deleteKey('${k.id}')">Delete</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function openNewKeyModal() {
+        document.getElementById('new-key-name').value = '';
+        document.getElementById('modal-generate').classList.add('open');
+    }
+
+    function closeModals() {
+        document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open'));
+    }
+
+    async function generateKey() {
+        const name = document.getElementById('new-key-name').value.trim();
+        if (!name) {
+            document.getElementById('new-key-name').style.borderColor = 'var(--red)';
+            setTimeout(() => document.getElementById('new-key-name').style.borderColor = '', 2000);
+            return;
+        }
+        try {
+            const res = await fetch('/api/settings/api-keys', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                showGeneratedKey(data.key);
+                apiKeys.push({ id: data.id, name, prefix: data.prefix, created: new Date().toISOString().split('T')[0], lastUsed: null });
+                renderKeys();
+            }
+        } catch (e) {
+            console.error('Failed to generate key:', e);
+            alert('Failed to generate API key. Please try again.');
+        }
+        closeModals();
+    }
+
+    function showGeneratedKey(key) {
+        document.getElementById('generated-key-value').textContent = key;
+        document.getElementById('modal-show-key').classList.add('open');
+    }
+
+    function copyKey() {
+        const key = document.getElementById('generated-key-value').textContent;
+        navigator.clipboard.writeText(key).then(() => {
+            const btn = document.querySelector('#modal-show-key .copy-btn');
+            btn.textContent = 'Copied!';
+            setTimeout(() => btn.textContent = 'Copy', 2000);
+        });
+    }
+
+    async function deleteKey(id) {
+        if (!confirm('Are you sure you want to delete this API key? This action cannot be undone.')) return;
+        try {
+            await fetch('/api/settings/api-keys/' + id, { method: 'DELETE' });
+        } catch (e) {
+            // Continue in demo mode
+        }
+        apiKeys = apiKeys.filter(k => k.id !== id);
+        renderKeys();
+    }
+
+    // Close modal on overlay click
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) closeModals();
+        });
+    });
+
+    // Close modal on escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeModals();
+    });
+
+    // Load real user data
+    async function loadUserData() {
+        try {
+            const res = await fetch('/api/auth/me');
+            if (!res.ok) { window.location.href = '/login'; return; }
+            const { user, company } = await res.json();
+            document.getElementById('account-name').value = user.name || '';
+            document.getElementById('account-email').value = user.email || '';
+            document.querySelector('.user-avatar').textContent = (user.name || 'U')[0].toUpperCase();
+            document.querySelector('.user-name').textContent = user.name || 'User';
+            document.querySelector('.user-email').textContent = user.email || '';
+            if (company) {
+                document.getElementById('company-name').value = company.name || '';
+                document.getElementById('company-desc').value = company.description || '';
+                if (company.industry) document.getElementById('company-industry').value = company.industry;
+                if (company.cycle_time) document.getElementById('cycle-time').value = company.cycle_time;
+                if (company.cycle_frequency) document.getElementById('cycle-frequency').value = company.cycle_frequency;
+                document.getElementById('cycle-enabled').checked = company.cycles_enabled !== false;
+            }
+        } catch (e) { console.error('Failed to load user:', e); }
+    }
+
+    // Load agents
+    async function loadAgents() {
+        try {
+            const res = await fetch('/api/agents');
+            if (!res.ok) return;
+            const data = await res.json();
+            const agents = data.agents || data || [];
+            const tbody = document.getElementById('agents-body');
+            const empty = document.getElementById('agents-empty');
+            if (!agents.length) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
+            empty.style.display = 'none';
+            tbody.innerHTML = agents.map(a => `
+                <tr>
+                    <td style="font-weight:500">${a.icon || '🤖'} ${escapeHtml(a.name)}</td>
+                    <td><span style="font-size:12px;color:var(--text-dim);text-transform:capitalize">${a.type || 'custom'}</span></td>
+                    <td style="color:var(--text-dim)">${a.tasks_completed || 0}</td>
+                    <td><span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:100px;${a.is_active ? 'background:rgba(0,229,153,0.1);color:var(--accent)' : 'background:var(--surface-2);color:var(--text-muted)'}">${a.is_active ? 'Active' : 'Disabled'}</span></td>
+                    <td style="text-align:right"><a href="/agents/${a.id}" class="btn btn-secondary btn-sm" style="text-decoration:none">View</a></td>
+                </tr>
+            `).join('');
+        } catch (e) { console.error('Failed to load agents:', e); }
+    }
+
+    function escapeHtml(str) { return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    // Save cycle config
+    async function saveCycleConfig() {
+        try {
+            const res = await fetch('/api/settings/cycle', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    cycle_time: document.getElementById('cycle-time').value,
+                    cycle_frequency: document.getElementById('cycle-frequency').value,
+                    cycles_enabled: document.getElementById('cycle-enabled').checked
+                })
+            });
+            if (res.ok) showStatus('cycle-status');
+        } catch (e) { console.error('Failed to save cycle config:', e); }
+    }
+
+    async function loadIntegrations() {
+      try {
+        const res = await fetch('/api/settings/integrations');
+        const data = await res.json();
+        const grid = document.getElementById('integrations-grid');
+        if (!data.integrations) return;
+
+        grid.innerHTML = data.integrations.map(i => `
+          <div style="background:var(--surface);border:1px solid ${i.connected ? 'rgba(0,229,153,0.2)' : 'rgba(239,68,68,0.2)'};border-radius:12px;padding:20px;display:flex;gap:16px;align-items:flex-start">
+            <div style="font-size:28px;flex-shrink:0">${i.icon}</div>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                <span style="font-weight:600;font-size:14px">${i.name}</span>
+                <span style="font-size:11px;padding:2px 8px;border-radius:100px;font-weight:600;${i.connected ? 'background:rgba(0,229,153,0.12);color:#00e599' : 'background:rgba(239,68,68,0.12);color:#ef4444'}">${i.connected ? '✓ Connected' : '✗ Not configured'}</span>
+              </div>
+              <div style="font-size:13px;color:var(--text-dim);line-height:1.5">${i.description}</div>
+            </div>
+          </div>
+        `).join('');
+      } catch (e) {
+        console.error('Load integrations error:', e);
+      }
+    }
+
+    // Init
+    loadKeys();
+    loadUserData();
+    loadAgents();
+    loadIntegrations();
+    </script>
+<script src="/sidebar.js"></script>
+</body>
+</html>

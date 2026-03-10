@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Learnings — Runloop</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ── Reset & Tokens ────────────────────────────── */
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root {
+            --bg:#08090d;
+            --surface:#0f1117;
+            --surface-2:#151821;
+            --surface-3:#1a1e2a;
+            --border:#1a1d27;
+            --border-light:#252838;
+            --text:#e8e9ed;
+            --text-dim:#7a7f8e;
+            --text-muted:#4a4f5e;
+            --accent:#00e599;
+            --accent-dim:rgba(0,229,153,0.12);
+            --accent-glow:rgba(0,229,153,0.25);
+            --purple:#8b5cf6;
+            --blue:#6366f1;
+            --amber:#f59e0b;
+            --red:#ef4444;
+            --cyan:#06b6d4;
+            --sidebar-w:260px;
+        }
+        body {
+            font-family:'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+            background:var(--bg);
+            color:var(--text);
+            line-height:1.6;
+            overflow-x:hidden;
+        }
+        /* noise overlay */
+        body::before {
+            content:'';position:fixed;top:0;left:0;right:0;bottom:0;
+            background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+            pointer-events:none;z-index:0;
+        }
+        a{color:inherit;text-decoration:none}
+        input,select,textarea,button{font-family:inherit}
+
+        /* ── App Shell ────────────────────────────── */
+        .app{display:flex;min-height:100vh;position:relative;z-index:1}
+
+        /* ── Sidebar ────────────────────────────── */
+        .sidebar {
+            width:var(--sidebar-w);
+            background:var(--surface);
+            border-right:1px solid var(--border);
+            padding:0;
+            display:flex;
+            flex-direction:column;
+            position:fixed;
+            top:0;bottom:0;left:0;
+            z-index:50;
+            transition:transform 0.3s cubic-bezier(.4,0,.2,1);
+        }
+        .sidebar-header {
+            padding:20px 20px 18px;
+            border-bottom:1px solid var(--border);
+        }
+        .logo {
+            font-family:'Space Grotesk',sans-serif;
+            font-weight:700;font-size:20px;letter-spacing:-0.5px;
+            display:flex;align-items:center;gap:10px;
+        }
+        .logo-mark {
+            width:30px;height:30px;border-radius:8px;
+            background:var(--accent);
+            display:flex;align-items:center;justify-content:center;flex-shrink:0;
+        }
+        .logo-mark svg{width:16px;height:16px}
+        .sidebar-nav{flex:1;padding:12px 12px 0;overflow-y:auto}
+        .nav-section{margin-bottom:16px}
+        .nav-section-label {
+            font-size:10px;font-weight:600;
+            text-transform:uppercase;letter-spacing:1.8px;
+            color:var(--text-muted);
+            padding:8px 12px 6px;
+        }
+        .nav-item {
+            display:flex;align-items:center;gap:10px;
+            padding:10px 12px;border-radius:8px;
+            font-size:14px;font-weight:500;color:var(--text-dim);
+            transition:all 0.15s;cursor:pointer;
+        }
+        .nav-item:hover{color:var(--text);background:var(--surface-2)}
+        .nav-item.active{color:var(--accent);background:var(--accent-dim)}
+        .nav-item .icon{width:20px;text-align:center;font-size:15px;flex-shrink:0}
+
+        /* sidebar footer / user pill */
+        .sidebar-footer{padding:12px 16px;border-top:1px solid var(--border)}
+        .user-pill {
+            display:flex;align-items:center;gap:10px;
+            padding:8px 10px;border-radius:10px;
+            transition:background 0.15s;cursor:pointer;
+            position:relative;
+        }
+        .user-pill:hover{background:var(--surface-2)}
+        .user-avatar {
+            width:34px;height:34px;border-radius:8px;
+            background:var(--accent-dim);
+            display:flex;align-items:center;justify-content:center;
+            font-size:14px;font-weight:700;color:var(--accent);flex-shrink:0;
+        }
+        .user-info{flex:1;min-width:0}
+        .user-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .user-email{font-size:11px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .user-menu-toggle{color:var(--text-muted);font-size:16px;flex-shrink:0;transition:transform 0.2s}
+        .user-pill.open .user-menu-toggle{transform:rotate(180deg)}
+
+        /* user dropdown */
+        .user-dropdown {
+            position:absolute;bottom:calc(100% + 8px);left:0;right:0;
+            background:var(--surface-2);
+            border:1px solid var(--border-light);
+            border-radius:10px;
+            padding:6px;
+            display:none;
+            box-shadow:0 -8px 32px rgba(0,0,0,0.4);
+            z-index:60;
+        }
+        .user-dropdown.open{display:block}
+        .user-dropdown-item {
+            display:flex;align-items:center;gap:8px;
+            padding:9px 12px;border-radius:6px;
+            font-size:13px;color:var(--text-dim);
+            cursor:pointer;transition:all 0.12s;border:none;
+            background:none;width:100%;text-align:left;
+        }
+        .user-dropdown-item:hover{background:var(--surface-3);color:var(--text)}
+        .user-dropdown-item.danger{color:var(--red)}
+        .user-dropdown-item.danger:hover{background:rgba(239,68,68,0.08)}
+
+        /* ── Main Content ────────────────────────────── */
+        .main{flex:1;margin-left:var(--sidebar-w);padding:32px 40px 48px;min-height:100vh}
+
+        /* ── Page Header ────────────────────────────── */
+        .page-header{margin-bottom:32px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+        .page-header-text h1 {
+            font-family:'Space Grotesk',sans-serif;
+            font-size:1.85rem;font-weight:700;letter-spacing:-0.5px;
+            margin-bottom:4px;
+        }
+        .page-header-text p{color:var(--text-dim);font-size:0.95rem}
+
+        /* ── Buttons ────────────────────────────── */
+        .btn{
+            display:inline-flex;align-items:center;justify-content:center;gap:6px;
+            border:none;border-radius:8px;
+            font-size:13px;font-weight:600;
+            cursor:pointer;transition:all 0.2s;
+        }
+        .btn-primary {
+            padding:10px 22px;
+            background:var(--accent);color:#08090d;
+        }
+        .btn-primary:hover{opacity:0.9;box-shadow:0 4px 16px var(--accent-glow)}
+        .btn-primary:disabled{opacity:0.5;cursor:not-allowed;transform:none;box-shadow:none}
+        .btn-secondary {
+            padding:10px 22px;
+            background:var(--surface-2);color:var(--text);
+            border:1px solid var(--border);
+        }
+        .btn-secondary:hover{border-color:var(--border-light)}
+
+        /* ── Search Bar ────────────────────────────── */
+        .search-bar {
+            position:relative;
+            margin-bottom:20px;
+            max-width:480px;
+        }
+        .search-bar svg {
+            position:absolute;left:14px;top:50%;transform:translateY(-50%);
+            color:var(--text-muted);pointer-events:none;
+        }
+        .search-input {
+            width:100%;padding:11px 14px 11px 42px;
+            background:var(--surface);
+            border:1px solid var(--border);
+            border-radius:10px;color:var(--text);
+            font-size:14px;
+            transition:all 0.2s;outline:none;
+        }
+        .search-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+        .search-input::placeholder{color:var(--text-muted)}
+
+        /* ── Tag Filter Bar ────────────────────────────── */
+        .tag-filter-bar {
+            display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+            margin-bottom:24px;
+            min-height:36px;
+        }
+        .tag-filter-label {
+            font-size:12px;font-weight:600;color:var(--text-muted);
+            text-transform:uppercase;letter-spacing:0.8px;
+            margin-right:4px;flex-shrink:0;
+        }
+        .tag-pill {
+            display:inline-flex;align-items:center;gap:4px;
+            padding:5px 12px;border-radius:100px;
+            font-size:12px;font-weight:600;
+            cursor:pointer;transition:all 0.2s;
+            border:1px solid transparent;
+            user-select:none;
+        }
+        .tag-pill:hover{transform:translateY(-1px);filter:brightness(1.15)}
+        .tag-pill.active{border-color:var(--text);box-shadow:0 0 0 1px rgba(232,233,237,0.2)}
+        .tag-pill-clear {
+            display:inline-flex;align-items:center;gap:4px;
+            padding:5px 12px;border-radius:100px;
+            font-size:12px;font-weight:500;
+            cursor:pointer;transition:all 0.2s;
+            background:var(--surface-2);color:var(--text-dim);
+            border:1px solid var(--border);
+        }
+        .tag-pill-clear:hover{color:var(--text);border-color:var(--border-light)}
+
+        /* ── Learning Cards ────────────────────────────── */
+        .learnings-list{display:flex;flex-direction:column;gap:12px}
+        .learning-card {
+            background:var(--surface);
+            border:1px solid var(--border);
+            border-radius:14px;
+            padding:22px 24px;
+            position:relative;
+            overflow:hidden;
+            transition:all 0.3s cubic-bezier(.4,0,.2,1);
+            backdrop-filter:blur(12px);
+            background:linear-gradient(135deg, rgba(15,17,23,0.85) 0%, rgba(21,24,33,0.75) 100%);
+        }
+        .learning-card::before {
+            content:'';
+            position:absolute;inset:0;
+            border-radius:14px;
+            padding:1px;
+            background:linear-gradient(135deg, rgba(255,255,255,0.06) 0%, transparent 50%);
+            -webkit-mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite:xor;
+            mask-composite:exclude;
+            pointer-events:none;
+        }
+        .learning-card:hover {
+            border-color:var(--border-light);
+            transform:translateY(-2px);
+            box-shadow:0 8px 32px rgba(0,0,0,0.25);
+        }
+        .learning-content {
+            font-size:14px;line-height:1.65;color:var(--text);
+            margin-bottom:14px;
+            word-break:break-word;
+        }
+        .learning-meta {
+            display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+        }
+        .learning-tags {
+            display:flex;gap:6px;flex-wrap:wrap;flex:1;min-width:0;
+        }
+        .learning-tag {
+            display:inline-flex;align-items:center;
+            padding:3px 10px;border-radius:100px;
+            font-size:11px;font-weight:600;
+            letter-spacing:0.2px;
+        }
+        .learning-agent {
+            display:flex;align-items:center;gap:6px;
+            font-size:12px;color:var(--text-dim);flex-shrink:0;
+        }
+        .learning-agent-icon {
+            width:22px;height:22px;border-radius:6px;
+            background:var(--accent-dim);
+            display:flex;align-items:center;justify-content:center;
+            font-size:11px;flex-shrink:0;
+        }
+        .learning-date {
+            font-family:'JetBrains Mono',monospace;
+            font-size:11px;color:var(--text-muted);flex-shrink:0;
+        }
+        .learning-confidence {
+            display:flex;align-items:center;gap:6px;flex-shrink:0;
+        }
+        .confidence-label {
+            font-size:11px;color:var(--text-muted);font-weight:500;
+        }
+        .confidence-bar-bg {
+            width:48px;height:5px;border-radius:3px;
+            background:var(--surface-3);overflow:hidden;
+        }
+        .confidence-bar-fill {
+            height:100%;border-radius:3px;
+            transition:width 0.4s ease;
+        }
+        .confidence-pct {
+            font-family:'JetBrains Mono',monospace;
+            font-size:11px;font-weight:500;
+        }
+
+        /* ── Empty State ────────────────────────────── */
+        .empty-state {
+            text-align:center;padding:64px 24px;
+            color:var(--text-muted);
+        }
+        .empty-state-icon {
+            font-size:56px;margin-bottom:16px;opacity:0.35;
+        }
+        .empty-state h3 {
+            font-family:'Space Grotesk',sans-serif;
+            color:var(--text);font-size:1.1rem;font-weight:600;
+            margin-bottom:8px;
+        }
+        .empty-state p {
+            font-size:14px;max-width:420px;margin:0 auto;line-height:1.6;
+        }
+
+        /* ── Loading Spinner ────────────────────────────── */
+        .loading-container {
+            display:flex;align-items:center;justify-content:center;
+            padding:48px 24px;
+        }
+        .spinner {
+            width:28px;height:28px;border-radius:50%;
+            border:3px solid var(--surface-3);
+            border-top-color:var(--accent);
+            animation:spin 0.8s linear infinite;
+        }
+        @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
+        /* ── Skeleton ────────────────────────────── */
+        .skeleton {
+            background:linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%);
+            background-size:200% 100%;
+            animation:shimmer 1.5s ease-in-out infinite;
+            border-radius:8px;
+        }
+        @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+        .skeleton-card{height:120px;border-radius:14px;margin-bottom:12px}
+
+        /* ── Modal ────────────────────────────── */
+        .modal-overlay {
+            position:fixed;inset:0;
+            background:rgba(0,0,0,0.65);
+            display:none;align-items:center;justify-content:center;
+            z-index:1000;
+            backdrop-filter:blur(6px);
+            opacity:0;
+            transition:opacity 0.25s;
+        }
+        .modal-overlay.open{display:flex;opacity:1}
+        .modal-overlay.opening{display:flex}
+        .modal {
+            background:var(--surface);
+            border:1px solid var(--border);
+            border-radius:18px;
+            padding:32px;
+            max-width:560px;width:92%;
+            max-height:90vh;overflow-y:auto;
+            transform:translateY(12px) scale(0.97);
+            transition:transform 0.3s cubic-bezier(.4,0,.2,1);
+        }
+        .modal-overlay.open .modal{transform:translateY(0) scale(1)}
+        .modal h2 {
+            font-family:'Space Grotesk',sans-serif;
+            font-size:1.25rem;font-weight:700;margin-bottom:4px;
+        }
+        .modal .modal-sub{color:var(--text-dim);font-size:14px;margin-bottom:24px}
+        .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:28px}
+
+        /* form in modal */
+        .form-group{margin-bottom:18px}
+        .form-label{display:block;font-size:13px;font-weight:500;color:var(--text-dim);margin-bottom:6px}
+        .form-input {
+            width:100%;padding:11px 14px;
+            background:var(--surface-2);
+            border:1px solid var(--border);
+            border-radius:8px;color:var(--text);
+            font-size:14px;
+            transition:all 0.2s;outline:none;
+        }
+        .form-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+        .form-input::placeholder{color:var(--text-muted)}
+        textarea.form-input{min-height:120px;resize:vertical;line-height:1.6}
+        .form-hint{font-size:12px;color:var(--text-muted);margin-top:5px}
+
+        /* ── Toast Notification System ────────────────────────────── */
+        .toast-container {
+            position:fixed;top:24px;right:24px;z-index:2000;
+            display:flex;flex-direction:column;gap:10px;
+            pointer-events:none;
+        }
+        .toast {
+            pointer-events:auto;
+            background:var(--surface);
+            border:1px solid var(--border);
+            border-radius:12px;
+            padding:14px 20px;
+            font-size:14px;font-weight:500;
+            display:flex;align-items:center;gap:10px;
+            box-shadow:0 12px 40px rgba(0,0,0,0.35);
+            transform:translateX(120%);
+            opacity:0;
+            transition:all 0.4s cubic-bezier(.4,0,.2,1);
+            max-width:380px;
+        }
+        .toast.visible{transform:translateX(0);opacity:1}
+        .toast.success{border-left:3px solid var(--accent)}
+        .toast.success .toast-icon{color:var(--accent)}
+        .toast.error{border-left:3px solid var(--red)}
+        .toast.error .toast-icon{color:var(--red)}
+        .toast-icon{font-size:18px;flex-shrink:0}
+        .toast-message{flex:1;color:var(--text)}
+        .toast-close {
+            background:none;border:none;color:var(--text-muted);
+            cursor:pointer;font-size:16px;padding:2px;
+            transition:color 0.15s;flex-shrink:0;
+        }
+        .toast-close:hover{color:var(--text)}
+
+        /* ── Mobile Hamburger ────────────────────────────── */
+        .mobile-toggle {
+            display:none;
+            position:fixed;top:16px;left:16px;z-index:60;
+            width:42px;height:42px;
+            background:var(--surface);
+            border:1px solid var(--border);
+            border-radius:10px;
+            align-items:center;justify-content:center;
+            cursor:pointer;
+            transition:all 0.2s;
+        }
+        .mobile-toggle:hover{background:var(--surface-2)}
+        .hamburger-lines{display:flex;flex-direction:column;gap:4px}
+        .hamburger-lines span {
+            display:block;width:18px;height:2px;
+            background:var(--text);border-radius:2px;
+            transition:all 0.3s;
+        }
+        .mobile-toggle.active .hamburger-lines span:nth-child(1){transform:rotate(45deg) translateY(4.2px) translateX(4.2px)}
+        .mobile-toggle.active .hamburger-lines span:nth-child(2){opacity:0;transform:translateX(-8px)}
+        .mobile-toggle.active .hamburger-lines span:nth-child(3){transform:rotate(-45deg) translateY(-4.2px) translateX(4.2px)}
+
+        /* sidebar backdrop on mobile */
+        .sidebar-backdrop {
+            display:none;position:fixed;inset:0;
+            background:rgba(0,0,0,0.5);z-index:40;
+            opacity:0;transition:opacity 0.3s;
+        }
+        .sidebar-backdrop.visible{display:block;opacity:1}
+
+        /* ── Stats Summary Row ────────────────────────────── */
+        .stats-mini {
+            display:flex;gap:24px;margin-bottom:28px;flex-wrap:wrap;
+        }
+        .stat-mini {
+            display:flex;align-items:center;gap:8px;
+        }
+        .stat-mini-value {
+            font-family:'JetBrains Mono',monospace;
+            font-size:1.2rem;font-weight:700;
+        }
+        .stat-mini-label {
+            font-size:12px;color:var(--text-dim);
+        }
+
+        /* ── Scrollbar ────────────────────────────── */
+        ::-webkit-scrollbar{width:6px}
+        ::-webkit-scrollbar-track{background:transparent}
+        ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+        ::-webkit-scrollbar-thumb:hover{background:var(--border-light)}
+
+        /* ── Responsive ────────────────────────────── */
+        @media (max-width:768px) {
+            .sidebar{transform:translateX(-100%)}
+            .sidebar.open{transform:translateX(0)}
+            .main{margin-left:0;padding:24px 16px 40px;padding-top:72px}
+            .mobile-toggle{display:flex}
+            .page-header{flex-direction:column}
+            .search-bar{max-width:100%}
+            .modal{padding:24px;max-width:100%;width:96%}
+            .toast-container{top:12px;right:12px;left:12px}
+            .toast{max-width:100%}
+            .stats-mini{gap:16px}
+        }
+        @media (max-width:480px) {
+            .page-header-text h1{font-size:1.5rem}
+        }
+
+        /* ── Animations ────────────────────────────── */
+        @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+        .fade-up{animation:fadeUp 0.5s ease both}
+        .delay-1{animation-delay:0.05s}
+        .delay-2{animation-delay:0.1s}
+        .delay-3{animation-delay:0.15s}
+        .delay-4{animation-delay:0.2s}
+        .delay-5{animation-delay:0.25s}
+    </style>
+</head>
+<body>
+    <!-- Mobile hamburger toggle -->
+    <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle navigation">
+        <div class="hamburger-lines"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Sidebar backdrop (mobile) -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+    <div class="app">
+        <!-- ─── Sidebar ──────────────────────────── -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <a href="/dashboard" class="logo">
+                    <div class="logo-mark">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="#08090d" stroke-width="2.5" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                    </div>
+                    Runloop
+                </a>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-label">Main</div>
+                    <a href="/dashboard" class="nav-item"><span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>Overview</a>
+                    <a href="/chat" class="nav-item"><span class="icon">💬</span>Chat</a>
+                    <a href="/tasks" class="nav-item"><span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span>Tasks</a>
+                    <a href="/analytics" class="nav-item"><span class="icon">📊</span>Analytics</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-label">Knowledge</div>
+                    <a href="/documents" class="nav-item"><span class="icon">📄</span>Documents</a>
+                    <a href="/memory" class="nav-item"><span class="icon">🧠</span>Memory</a>
+                    <a href="/skills" class="nav-item"><span class="icon">⚙️</span>Skills</a>
+                    <a href="/learnings" class="nav-item active"><span class="icon">💡</span>Learnings</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-label">Automation</div>
+                    <a href="/workflows" class="nav-item"><span class="icon">🔄</span>Workflows</a>
+                    <a href="/email" class="nav-item"><span class="icon">📧</span>Email</a>
+                    <a href="/cycles" class="nav-item"><span class="icon">🌙</span>Cycles</a>
+                    <a href="/reports" class="nav-item"><span class="icon">📋</span>Reports</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-label">Build</div>
+                    <a href="/agent-factory" class="nav-item"><span class="icon">🏭</span>Agent Factory</a>
+                    <a href="/settings" class="nav-item"><span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></span>Settings</a>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-pill" id="userPill" onclick="toggleUserMenu()">
+                    <div class="user-avatar" id="userAvatar">--</div>
+                    <div class="user-info">
+                        <div class="user-name" id="userName">Loading...</div>
+                        <div class="user-email" id="userEmail">...</div>
+                    </div>
+                    <span class="user-menu-toggle">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 15l-6-6-6 6"/></svg>
+                    </span>
+
+                    <div class="user-dropdown" id="userDropdown">
+                        <a href="/settings" class="user-dropdown-item">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9"/></svg>
+                            Settings
+                        </a>
+                        <button class="user-dropdown-item danger" onclick="handleLogout(event)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                            Log out
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ─── Main Content ──────────────────────────── -->
+        <main class="main" id="mainContent">
+            <!-- Page Header -->
+            <div class="page-header fade-up">
+                <div class="page-header-text">
+                    <h1>Learnings</h1>
+                    <p>Knowledge base &mdash; agents get smarter over time</p>
+                </div>
+                <button class="btn btn-primary" onclick="openAddModal()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Add Learning
+                </button>
+            </div>
+
+            <!-- Stats Mini -->
+            <div class="stats-mini fade-up delay-1" id="statsMini">
+                <div class="stat-mini">
+                    <span class="stat-mini-value" style="color:var(--accent)" id="statTotal">--</span>
+                    <span class="stat-mini-label">total learnings</span>
+                </div>
+                <div class="stat-mini">
+                    <span class="stat-mini-value" style="color:var(--purple)" id="statTags">--</span>
+                    <span class="stat-mini-label">unique tags</span>
+                </div>
+                <div class="stat-mini">
+                    <span class="stat-mini-value" style="color:var(--blue)" id="statAgents">--</span>
+                    <span class="stat-mini-label">contributing agents</span>
+                </div>
+            </div>
+
+            <!-- Search Bar -->
+            <div class="search-bar fade-up delay-2">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" class="search-input" id="searchInput" placeholder="Search learnings..." autocomplete="off">
+            </div>
+
+            <!-- Tag Filter Bar -->
+            <div class="tag-filter-bar fade-up delay-3" id="tagFilterBar">
+                <span class="tag-filter-label">Tags</span>
+                <!-- Tags populated by JS -->
+            </div>
+
+            <!-- Learnings List -->
+            <div class="learnings-list fade-up delay-4" id="learningsList">
+                <!-- skeleton cards while loading -->
+                <div class="skeleton skeleton-card"></div>
+                <div class="skeleton skeleton-card"></div>
+                <div class="skeleton skeleton-card"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ─── Add Learning Modal ──────────────────────────── -->
+    <div class="modal-overlay" id="addModal">
+        <div class="modal">
+            <h2>Add Learning</h2>
+            <p class="modal-sub">Contribute knowledge to help agents make better decisions</p>
+            <form id="addForm" onsubmit="handleAddSubmit(event)">
+                <div class="form-group">
+                    <label class="form-label" for="learningContent">Content</label>
+                    <textarea id="learningContent" class="form-input" placeholder="Describe the learning or insight..." required></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="learningTags">Tags</label>
+                    <input type="text" id="learningTags" class="form-input" placeholder="e.g. deployment, postgres, auth">
+                    <div class="form-hint">Comma-separated. Tags help agents find relevant knowledge.</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="learningSource">Source (optional)</label>
+                    <input type="text" id="learningSource" class="form-input" placeholder="e.g. Production incident on Feb 12">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="addSubmitBtn">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        Add Learning
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ─── Toast Container ──────────────────────────── -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+    /* ==============================================================
+       State
+       ============================================================== */
+    let currentUser = null;
+    let allLearnings = [];
+    let allTags = [];
+    let activeTag = null;
+    let searchQuery = '';
+    let searchDebounceTimer = null;
+    let isLoading = false;
+
+    /* ==============================================================
+       Tag Color System — deterministic hash-based colors
+       ============================================================== */
+    const TAG_PALETTES = [
+        { bg: 'rgba(0,229,153,0.12)',   text: '#00e599' },
+        { bg: 'rgba(139,92,246,0.12)',   text: '#8b5cf6' },
+        { bg: 'rgba(99,102,241,0.12)',   text: '#6366f1' },
+        { bg: 'rgba(245,158,11,0.12)',   text: '#f59e0b' },
+        { bg: 'rgba(6,182,212,0.12)',    text: '#06b6d4' },
+        { bg: 'rgba(239,68,68,0.12)',    text: '#ef4444' },
+        { bg: 'rgba(236,72,153,0.12)',   text: '#ec4899' },
+        { bg: 'rgba(34,211,238,0.12)',   text: '#22d3ee' },
+        { bg: 'rgba(168,85,247,0.12)',   text: '#a855f7' },
+        { bg: 'rgba(251,146,60,0.12)',   text: '#fb923c' },
+        { bg: 'rgba(74,222,128,0.12)',   text: '#4ade80' },
+        { bg: 'rgba(56,189,248,0.12)',   text: '#38bdf8' },
+    ];
+
+    function hashString(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            hash = ((hash << 5) - hash) + str.charCodeAt(i);
+            hash |= 0;
+        }
+        return Math.abs(hash);
+    }
+
+    function getTagColor(tag) {
+        const idx = hashString(tag.toLowerCase().trim()) % TAG_PALETTES.length;
+        return TAG_PALETTES[idx];
+    }
+
+    /* ==============================================================
+       Helpers
+       ============================================================== */
+    async function apiFetch(url, opts = {}) {
+        const res = await fetch(url, {
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', ...opts.headers },
+            ...opts
+        });
+        if (res.status === 401) {
+            window.location.href = '/login';
+            throw new Error('Unauthorized');
+        }
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Request failed');
+        return data;
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    function truncate(str, len) {
+        if (!str) return '';
+        if (str.length <= len) return str;
+        return str.slice(0, len).trimEnd() + '...';
+    }
+
+    function getInitials(name) {
+        if (!name) return '?';
+        return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    }
+
+    function timeAgo(dateStr) {
+        if (!dateStr) return '';
+        const now = new Date();
+        const date = new Date(dateStr);
+        const diffMs = now - date;
+        const diffS = Math.floor(diffMs / 1000);
+        const diffM = Math.floor(diffS / 60);
+        const diffH = Math.floor(diffM / 60);
+        const diffD = Math.floor(diffH / 24);
+
+        if (diffS < 10) return 'just now';
+        if (diffS < 60) return diffS + 's ago';
+        if (diffM < 60) return diffM + 'm ago';
+        if (diffH < 24) return diffH + 'h ago';
+        if (diffD < 7) return diffD + 'd ago';
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function formatDate(dateStr) {
+        if (!dateStr) return '';
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    /* ==============================================================
+       Toast System
+       ============================================================== */
+    function showToast(message, type) {
+        type = type || 'success';
+        var container = document.getElementById('toastContainer');
+        var toast = document.createElement('div');
+        toast.className = 'toast ' + type;
+
+        var iconSvg = type === 'success'
+            ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>'
+            : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
+
+        toast.innerHTML =
+            '<span class="toast-icon">' + iconSvg + '</span>' +
+            '<span class="toast-message">' + escapeHtml(message) + '</span>' +
+            '<button class="toast-close" onclick="this.parentElement.remove()" aria-label="Dismiss">&times;</button>';
+
+        container.appendChild(toast);
+        requestAnimationFrame(function() {
+            requestAnimationFrame(function() { toast.classList.add('visible'); });
+        });
+        setTimeout(function() {
+            toast.classList.remove('visible');
+            setTimeout(function() { toast.remove(); }, 400);
+        }, 4500);
+    }
+
+    /* ==============================================================
+       Modal
+       ============================================================== */
+    function openAddModal() {
+        var modal = document.getElementById('addModal');
+        document.getElementById('learningContent').value = '';
+        document.getElementById('learningTags').value = '';
+        document.getElementById('learningSource').value = '';
+        document.getElementById('addSubmitBtn').disabled = false;
+        document.getElementById('addSubmitBtn').innerHTML =
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Learning';
+        modal.classList.add('opening');
+        requestAnimationFrame(function() {
+            requestAnimationFrame(function() { modal.classList.add('open'); });
+        });
+        setTimeout(function() { document.getElementById('learningContent').focus(); }, 150);
+    }
+
+    function closeModal() {
+        var modal = document.getElementById('addModal');
+        modal.classList.remove('open');
+        setTimeout(function() { modal.classList.remove('opening'); }, 300);
+    }
+
+    document.getElementById('addModal').addEventListener('click', function(e) {
+        if (e.target === this) closeModal();
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeModal();
+    });
+
+    async function handleAddSubmit(e) {
+        e.preventDefault();
+        var content = document.getElementById('learningContent').value.trim();
+        var tagsRaw = document.getElementById('learningTags').value.trim();
+        var source = document.getElementById('learningSource').value.trim();
+        var btn = document.getElementById('addSubmitBtn');
+
+        if (!content) return;
+
+        var tags = tagsRaw
+            ? tagsRaw.split(',').map(function(t) { return t.trim(); }).filter(function(t) { return t.length > 0; })
+            : [];
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;display:inline-block;vertical-align:middle"></span> Adding...';
+
+        try {
+            await apiFetch('/api/learnings', {
+                method: 'POST',
+                body: JSON.stringify({
+                    content: content,
+                    tags: tags,
+                    agent_id: null,
+                    source: source || null
+                })
+            });
+            closeModal();
+            showToast('Learning added successfully');
+            loadLearnings();
+        } catch (err) {
+            showToast(err.message || 'Failed to add learning', 'error');
+            btn.disabled = false;
+            btn.innerHTML =
+                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Learning';
+        }
+    }
+
+    /* ==============================================================
+       Data Loading
+       ============================================================== */
+    async function loadUser() {
+        try {
+            var data = await apiFetch('/api/auth/me');
+            currentUser = data.user;
+            document.getElementById('userName').textContent = currentUser.name || 'User';
+            document.getElementById('userEmail').textContent = currentUser.email || '';
+            document.getElementById('userAvatar').textContent = getInitials(currentUser.name || currentUser.email);
+        } catch (err) {
+            console.error('Failed to load user:', err);
+        }
+    }
+
+    async function loadLearnings() {
+        isLoading = true;
+        var listEl = document.getElementById('learningsList');
+
+        // Show loading state
+        listEl.innerHTML =
+            '<div class="skeleton skeleton-card"></div>' +
+            '<div class="skeleton skeleton-card"></div>' +
+            '<div class="skeleton skeleton-card"></div>';
+
+        try {
+            var data;
+            if (searchQuery) {
+                data = await apiFetch('/api/learnings/search?q=' + encodeURIComponent(searchQuery));
+            } else if (activeTag) {
+                data = await apiFetch('/api/learnings/tags/' + encodeURIComponent(activeTag));
+            } else {
+                data = await apiFetch('/api/learnings');
+            }
+
+            allLearnings = data.learnings || data || [];
+            if (!Array.isArray(allLearnings)) allLearnings = [];
+
+            // Extract all unique tags
+            extractTags();
+            renderTagBar();
+            renderLearnings();
+            updateStats();
+        } catch (err) {
+            console.error('Failed to load learnings:', err);
+            listEl.innerHTML =
+                '<div class="empty-state">' +
+                    '<div class="empty-state-icon">&#x26A0;&#xFE0F;</div>' +
+                    '<h3>Failed to load learnings</h3>' +
+                    '<p>There was an error fetching the data. Please try refreshing the page.</p>' +
+                '</div>';
+        } finally {
+            isLoading = false;
+        }
+    }
+
+    function extractTags() {
+        var tagSet = {};
+        allLearnings.forEach(function(l) {
+            var tags = l.tags || [];
+            if (typeof tags === 'string') {
+                try { tags = JSON.parse(tags); } catch(e) { tags = [tags]; }
+            }
+            if (Array.isArray(tags)) {
+                tags.forEach(function(t) {
+                    var tag = (typeof t === 'string' ? t : String(t)).trim().toLowerCase();
+                    if (tag) tagSet[tag] = (tagSet[tag] || 0) + 1;
+                });
+            }
+        });
+
+        allTags = Object.keys(tagSet).sort(function(a, b) {
+            return tagSet[b] - tagSet[a]; // Sort by frequency
+        });
+    }
+
+    function renderTagBar() {
+        var bar = document.getElementById('tagFilterBar');
+        var html = '<span class="tag-filter-label">Tags</span>';
+
+        if (allTags.length === 0) {
+            bar.innerHTML = html + '<span style="font-size:12px;color:var(--text-muted)">No tags yet</span>';
+            return;
+        }
+
+        if (activeTag) {
+            html += '<button class="tag-pill-clear" onclick="clearTagFilter()">' +
+                '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+                ' Clear</button>';
+        }
+
+        allTags.forEach(function(tag) {
+            var color = getTagColor(tag);
+            var isActive = activeTag === tag;
+            html += '<button class="tag-pill' + (isActive ? ' active' : '') + '" ' +
+                'style="background:' + color.bg + ';color:' + color.text + '" ' +
+                'onclick="toggleTagFilter(\'' + escapeHtml(tag).replace(/'/g, "\\'") + '\')">' +
+                escapeHtml(tag) + '</button>';
+        });
+
+        bar.innerHTML = html;
+    }
+
+    function renderLearnings() {
+        var listEl = document.getElementById('learningsList');
+
+        if (allLearnings.length === 0) {
+            var emptyMsg = searchQuery
+                ? 'No learnings match your search "' + escapeHtml(searchQuery) + '"'
+                : (activeTag
+                    ? 'No learnings with tag "' + escapeHtml(activeTag) + '"'
+                    : 'No learnings yet &mdash; agents create learnings as they discover useful information');
+
+            var emptyTitle = searchQuery || activeTag ? 'No results found' : 'No learnings yet';
+
+            listEl.innerHTML =
+                '<div class="empty-state">' +
+                    '<div class="empty-state-icon">&#x1F4A1;</div>' +
+                    '<h3>' + emptyTitle + '</h3>' +
+                    '<p>' + emptyMsg + '</p>' +
+                '</div>';
+            return;
+        }
+
+        listEl.innerHTML = allLearnings.map(function(learning, i) {
+            var content = learning.content || '';
+            var displayContent = escapeHtml(truncate(content, 200));
+
+            // Parse tags
+            var tags = learning.tags || [];
+            if (typeof tags === 'string') {
+                try { tags = JSON.parse(tags); } catch(e) { tags = [tags]; }
+            }
+            if (!Array.isArray(tags)) tags = [];
+
+            var tagsHtml = tags.map(function(t) {
+                var tag = (typeof t === 'string' ? t : String(t)).trim();
+                if (!tag) return '';
+                var color = getTagColor(tag);
+                return '<span class="learning-tag" style="background:' + color.bg + ';color:' + color.text + '">' +
+                    escapeHtml(tag) + '</span>';
+            }).join('');
+
+            // Agent info
+            var agentName = learning.agent_name || learning.source || 'Manual';
+            var agentIcon = learning.agent_icon || '&#x1F916;';
+
+            // Confidence
+            var confidence = learning.confidence != null ? parseFloat(learning.confidence) : null;
+            var confidenceHtml = '';
+            if (confidence !== null && !isNaN(confidence)) {
+                var pct = Math.round(confidence * 100);
+                var barColor = pct >= 80 ? 'var(--accent)' : (pct >= 50 ? 'var(--amber)' : 'var(--red)');
+                confidenceHtml =
+                    '<div class="learning-confidence">' +
+                        '<span class="confidence-label">confidence</span>' +
+                        '<div class="confidence-bar-bg">' +
+                            '<div class="confidence-bar-fill" style="width:' + pct + '%;background:' + barColor + '"></div>' +
+                        '</div>' +
+                        '<span class="confidence-pct" style="color:' + barColor + '">' + pct + '%</span>' +
+                    '</div>';
+            }
+
+            // Date
+            var dateStr = learning.created_at ? timeAgo(learning.created_at) : '';
+
+            var delayClass = 'delay-' + Math.min(i + 1, 5);
+
+            return '<div class="learning-card fade-up ' + delayClass + '">' +
+                '<div class="learning-content">' + displayContent + '</div>' +
+                '<div class="learning-meta">' +
+                    '<div class="learning-tags">' + tagsHtml + '</div>' +
+                    '<div class="learning-agent">' +
+                        '<div class="learning-agent-icon">' + agentIcon + '</div>' +
+                        '<span>' + escapeHtml(agentName) + '</span>' +
+                    '</div>' +
+                    confidenceHtml +
+                    (dateStr ? '<div class="learning-date">' + dateStr + '</div>' : '') +
+                '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    function updateStats() {
+        document.getElementById('statTotal').textContent = allLearnings.length;
+        document.getElementById('statTags').textContent = allTags.length;
+
+        var agentSet = {};
+        allLearnings.forEach(function(l) {
+            var name = l.agent_name || l.source || 'manual';
+            agentSet[name] = true;
+        });
+        document.getElementById('statAgents').textContent = Object.keys(agentSet).length;
+    }
+
+    /* ==============================================================
+       Search (debounced)
+       ============================================================== */
+    document.getElementById('searchInput').addEventListener('input', function() {
+        var query = this.value.trim();
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(function() {
+            searchQuery = query;
+            if (query) {
+                activeTag = null; // Clear tag filter when searching
+            }
+            loadLearnings();
+        }, 300);
+    });
+
+    /* ==============================================================
+       Tag Filtering
+       ============================================================== */
+    function toggleTagFilter(tag) {
+        if (activeTag === tag) {
+            activeTag = null;
+        } else {
+            activeTag = tag;
+        }
+        searchQuery = '';
+        document.getElementById('searchInput').value = '';
+        loadLearnings();
+    }
+
+    function clearTagFilter() {
+        activeTag = null;
+        loadLearnings();
+    }
+
+    /* ==============================================================
+       Logout
+       ============================================================== */
+    async function handleLogout(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        try {
+            await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
+        } catch (err) {
+            // even on error, redirect
+        }
+        window.location.href = '/login';
+    }
+
+    /* ==============================================================
+       User Menu
+       ============================================================== */
+    function toggleUserMenu() {
+        var pill = document.getElementById('userPill');
+        var dropdown = document.getElementById('userDropdown');
+        var isOpen = dropdown.classList.contains('open');
+        if (isOpen) {
+            dropdown.classList.remove('open');
+            pill.classList.remove('open');
+        } else {
+            dropdown.classList.add('open');
+            pill.classList.add('open');
+        }
+    }
+
+    document.addEventListener('click', function(e) {
+        var pill = document.getElementById('userPill');
+        if (!pill.contains(e.target)) {
+            document.getElementById('userDropdown').classList.remove('open');
+            pill.classList.remove('open');
+        }
+    });
+
+    /* ==============================================================
+       Mobile Sidebar
+       ============================================================== */
+    var mobileToggle = document.getElementById('mobileToggle');
+    var sidebarEl = document.getElementById('sidebar');
+    var backdropEl = document.getElementById('sidebarBackdrop');
+
+    function toggleSidebar() {
+        var isOpen = sidebarEl.classList.contains('open');
+        if (isOpen) {
+            sidebarEl.classList.remove('open');
+            backdropEl.classList.remove('visible');
+            mobileToggle.classList.remove('active');
+        } else {
+            sidebarEl.classList.add('open');
+            backdropEl.classList.add('visible');
+            mobileToggle.classList.add('active');
+        }
+    }
+
+    mobileToggle.addEventListener('click', toggleSidebar);
+    backdropEl.addEventListener('click', toggleSidebar);
+
+    /* ==============================================================
+       Init
+       ============================================================== */
+    (async function init() {
+        await Promise.all([
+            loadUser(),
+            loadLearnings()
+        ]);
+    })();
+    </script>
+<script src="/sidebar.js"></script>
+</body>
+</html>

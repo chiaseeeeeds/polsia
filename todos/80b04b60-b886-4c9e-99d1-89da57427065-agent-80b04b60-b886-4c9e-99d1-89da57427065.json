@@ -1,0 +1,52 @@
+[
+  {
+    "content": "Phase 6: Enhance Memory System (search, auto-save, context injection, UI)",
+    "status": "completed",
+    "activeForm": "Enhancing Memory System"
+  },
+  {
+    "content": "Phase 7: Enhance Documents (CRUD, editor UI, agent injection)",
+    "status": "completed",
+    "activeForm": "Enhancing Documents System"
+  },
+  {
+    "content": "Phase 9: Build Onboarding Wizard (5 steps, doc generation, starter tasks)",
+    "status": "completed",
+    "activeForm": "Building Onboarding Wizard"
+  },
+  {
+    "content": "Phase 10: Build Cycle Engine (plan, execute, review, morning summary)",
+    "status": "completed",
+    "activeForm": "Building Cycle Engine"
+  },
+  {
+    "content": "Phase 11: Enhance Recurring Tasks (scheduler, run tracking, UI)",
+    "status": "completed",
+    "activeForm": "Enhancing Recurring Tasks"
+  },
+  {
+    "content": "Phase 14: Enhance Skills & Learnings (search, tags, UI pages)",
+    "status": "completed",
+    "activeForm": "Enhancing Skills & Learnings"
+  },
+  {
+    "content": "Build all UI pages (memory, documents, cycles, skills, learnings, onboarding)",
+    "status": "completed",
+    "activeForm": "Building all UI pages"
+  },
+  {
+    "content": "Fix schema mismatches: all tables (tasks, messages, learnings, skills, agents, recurring, executions)",
+    "status": "completed",
+    "activeForm": "Fixing schema mismatches"
+  },
+  {
+    "content": "Deploy fixes and verify zero errors",
+    "status": "in_progress",
+    "activeForm": "Deploying fixes and verifying"
+  },
+  {
+    "content": "Complete task, send notifications",
+    "status": "pending",
+    "activeForm": "Completing task and sending notifications"
+  }
+]

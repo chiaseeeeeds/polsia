@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat - Runloop</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <link rel="stylesheet" href="/app.css">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{
+      /* Premium color system - rich blacks, not harsh */
+      --bg:#09090b;--surface:#111113;--surface-2:#18181b;--surface-3:#1f1f23;--elevated:#27272a;
+      --border:#27272a;--border-light:#3f3f46;
+      /* Text hierarchy */
+      --text:#fafafa;--text-secondary:#a1a1aa;--text-muted:#71717a;--text-subtle:#52525b;
+      /* Accent colors - refined indigo/violet gradient */
+      --accent:#6366f1;--accent2:#8b5cf6;--accent-hover:#7c71f8;
+      --green:#10b981;--red:#ef4444;--amber:#f59e0b;--blue:#3b82f6;
+    }
+    body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;overflow:hidden;height:100vh;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+
+    /* Layout */
+    .app-layout{display:flex;height:100vh}
+
+    /* Left sidebar - navigation */
+    .nav-sidebar{width:64px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:16px 0;gap:6px;flex-shrink:0}
+    .nav-logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;margin-bottom:20px;cursor:pointer;transition:transform 0.2s ease}
+    .nav-logo:hover{transform:scale(1.05)}
+    .nav-logo svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round}
+    .nav-btn{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:var(--text-muted);text-decoration:none;transition:all 0.15s ease;font-size:18px;border:none;background:none;cursor:pointer;position:relative}
+    .nav-btn:hover{background:var(--surface-2);color:var(--text);transform:translateY(-1px)}
+    .nav-btn.active{background:rgba(99,102,241,0.12);color:var(--accent);border:1px solid rgba(99,102,241,0.2)}
+    .nav-btn:not(.active){border:1px solid transparent}
+    .nav-btn .tooltip{position:absolute;left:56px;background:var(--elevated);color:var(--text);padding:8px 12px;border-radius:8px;font-size:12px;font-weight:500;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity 0.15s ease;z-index:100;border:1px solid var(--border-light)}
+    .nav-btn:hover .tooltip{opacity:1}
+    .nav-spacer{flex:1}
+
+    /* Chat sidebar */
+    .chat-sidebar{width:300px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+    .sidebar-header{padding:20px 16px;border-bottom:1px solid var(--border)}
+    .sidebar-title{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;color:var(--text-muted);letter-spacing:0.05em;text-transform:uppercase;margin-bottom:12px}
+    .new-chat-btn{width:100%;padding:12px 16px;background:var(--accent);border:none;border-radius:10px;color:#fff;font-weight:600;font-size:14px;cursor:pointer;transition:all 0.15s ease;font-family:'Inter',sans-serif;display:flex;align-items:center;gap:8px;justify-content:center}
+    .new-chat-btn:hover{background:var(--accent-hover);transform:translateY(-1px);box-shadow:0 4px 12px rgba(99,102,241,0.25)}
+    .new-chat-btn svg{width:16px;height:16px}
+    .conversations-list{flex:1;overflow-y:auto;padding:12px 8px}
+    .conversations-list::-webkit-scrollbar{width:4px}
+    .conversations-list::-webkit-scrollbar-track{background:transparent}
+    .conversations-list::-webkit-scrollbar-thumb{background:var(--border-light);border-radius:2px}
+    .conversations-list::-webkit-scrollbar-thumb:hover{background:var(--text-subtle)}
+    .conv-date-group{padding:12px 12px 8px;font-size:11px;font-weight:600;color:var(--text-subtle);text-transform:uppercase;letter-spacing:0.06em}
+    .conversation-item{padding:12px;margin-bottom:4px;border-radius:10px;cursor:pointer;transition:all 0.15s ease;display:flex;align-items:center;gap:12px;position:relative}
+    .conversation-item:hover{background:var(--surface-2)}
+    .conversation-item:hover .conv-delete-btn{opacity:1}
+    .conversation-item.active{background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.25)}
+    .conversation-item:not(.active){border:1px solid transparent}
+    .conv-icon{font-size:18px;flex-shrink:0}
+    .conv-delete-btn:hover{background:rgba(239,68,68,0.2)!important;border-color:rgba(239,68,68,0.4)!important;transform:scale(1.05)}
+    .conv-info{flex:1;min-width:0}
+    .conv-title{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
+    .conv-time{font-size:11px;color:var(--text-muted);margin-top:2px}
+    .conv-empty{padding:40px 20px;text-align:center;color:var(--text-muted);font-size:13px}
+
+    /* Main chat area */
+    .chat-main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
+    .chat-header{padding:14px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;background:rgba(17,17,19,0.8);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);z-index:10}
+    .agent-badge{display:flex;align-items:center;gap:8px;padding:6px 14px;background:var(--surface-2);border:1px solid var(--border-light);border-radius:10px;font-size:14px;font-weight:500}
+    .agent-badge .icon{font-size:18px}
+    .agent-selector{padding:8px 14px;background:var(--surface-2);border:1px solid var(--border-light);border-radius:10px;color:var(--text);font-size:14px;font-family:'DM Sans',sans-serif;cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b8d97' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px;transition:border-color 0.2s}
+    .agent-selector:hover{border-color:var(--accent)}
+    .agent-selector:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(124,58,237,0.2)}
+    .agent-selector option{background:var(--surface-2);color:var(--text)}
+    .header-spacer{flex:1}
+    .header-btn{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text-dim);border:1px solid var(--border);background:none;cursor:pointer;transition:all 0.2s}
+    .header-btn:hover{background:var(--surface-2);color:var(--text)}
+
+    /* Messages area */
+    .chat-messages{flex:1;overflow-y:auto;padding:32px 0;scroll-behavior:smooth}
+    .chat-messages::-webkit-scrollbar{width:6px}
+    .chat-messages::-webkit-scrollbar-track{background:transparent}
+    .chat-messages::-webkit-scrollbar-thumb{background:var(--border-light);border-radius:3px}
+    .chat-messages::-webkit-scrollbar-thumb:hover{background:var(--text-subtle)}
+    .messages-inner{max-width:900px;margin:0 auto;padding:0 32px}
+
+    /* Message bubbles - premium clean design */
+    .message{display:flex;gap:16px;margin-bottom:32px;animation:msgIn 0.25s cubic-bezier(0.4,0,0.2,1)}
+    @keyframes msgIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+    .message.user{justify-content:flex-end}
+    .message-avatar{width:36px;height:36px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;margin-top:4px}
+    .message.agent .message-avatar{background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.2)}
+    .message.user .message-avatar{background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.25);order:2}
+    .message-body{max-width:720px;min-width:0}
+    .message.user .message-body{display:flex;flex-direction:column;align-items:flex-end}
+    .message-meta{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+    .message-name{font-size:13px;font-weight:600;color:var(--text-secondary);letter-spacing:-0.01em}
+    .message-time{font-size:11px;color:var(--text-muted);font-weight:500}
+
+    /* User message bubble - clean with subtle accent */
+    .message.user .message-bubble{background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.2);border-radius:20px 20px 4px 20px;padding:14px 18px;color:var(--text);font-size:15px;line-height:1.6;font-weight:400}
+
+    /* Agent message bubble - clean surface */
+    .message.agent .message-bubble{background:var(--surface-2);border:1px solid var(--border);border-radius:20px 20px 20px 4px;padding:18px 22px;color:var(--text);font-size:15px;line-height:1.7;font-weight:400}
+
+    /* Markdown content styling */
+    .message-bubble h1,.message-bubble h2,.message-bubble h3,.message-bubble h4{font-family:'Space Grotesk',sans-serif;color:var(--text);margin:16px 0 8px;line-height:1.3}
+    .message-bubble h1:first-child,.message-bubble h2:first-child,.message-bubble h3:first-child{margin-top:0}
+    .message-bubble h1{font-size:1.4em}
+    .message-bubble h2{font-size:1.2em}
+    .message-bubble h3{font-size:1.1em}
+    .message-bubble p{margin:0 0 12px}
+    .message-bubble p:last-child{margin-bottom:0}
+    .message-bubble ul,.message-bubble ol{margin:8px 0;padding-left:24px}
+    .message-bubble li{margin:4px 0}
+    .message-bubble strong{color:var(--text);font-weight:600}
+    .message-bubble em{color:var(--text-dim);font-style:italic}
+    .message-bubble a{color:var(--accent2);text-decoration:none;border-bottom:1px solid rgba(59,130,246,0.3)}
+    .message-bubble a:hover{border-bottom-color:var(--accent2)}
+    .message-bubble blockquote{border-left:3px solid var(--accent);padding:8px 16px;margin:12px 0;background:rgba(124,58,237,0.06);border-radius:0 8px 8px 0;color:var(--text-dim);font-style:italic}
+    .message-bubble hr{border:none;border-top:1px solid var(--border);margin:16px 0}
+    .message-bubble table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px}
+    .message-bubble th,.message-bubble td{padding:8px 12px;border:1px solid var(--border);text-align:left}
+    .message-bubble th{background:var(--surface-2);font-weight:600;color:var(--text)}
+
+    /* Inline code */
+    .message-bubble code:not(pre code){background:rgba(124,58,237,0.12);color:#c4b5fd;padding:2px 6px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:0.85em}
+
+    /* Code blocks */
+    .message-bubble pre{margin:12px 0;border-radius:10px;overflow:hidden;border:1px solid var(--border);position:relative}
+    .message-bubble pre code{display:block;padding:16px;font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.5;overflow-x:auto;background:rgba(0,0,0,0.4) !important}
+    .code-header{display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:rgba(255,255,255,0.03);border-bottom:1px solid var(--border);font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;letter-spacing:0.5px}
+    .copy-code-btn{padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:none;color:var(--text-muted);cursor:pointer;font-size:11px;font-family:'DM Sans',sans-serif;transition:all 0.15s}
+    .copy-code-btn:hover{background:var(--surface-2);color:var(--text)}
+    .copy-code-btn.copied{color:var(--green);border-color:rgba(0,229,153,0.3)}
+
+    /* Tool calls - compact and clean */
+    .tool-calls-container{margin-top:12px;display:flex;flex-direction:column;gap:6px}
+    .tool-call-block{background:var(--surface-3);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:all 0.15s ease}
+    .tool-call-header{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;transition:background 0.15s ease;font-size:13px;color:var(--text-secondary)}
+    .tool-call-header:hover{background:var(--elevated)}
+    .tool-call-icon{font-size:14px;opacity:0.7}
+    .tool-call-name{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12px;flex:1}
+    .tool-call-toggle{width:14px;height:14px;color:var(--text-muted);transition:transform 0.2s ease}
+    .tool-call-block.expanded .tool-call-toggle{transform:rotate(180deg)}
+    .tool-call-body{display:none;padding:10px 14px;border-top:1px solid var(--border);font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--text-secondary);max-height:200px;overflow-y:auto;background:rgba(0,0,0,0.3);line-height:1.5}
+    .tool-call-block.expanded .tool-call-body{display:block}
+    .tool-result-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:600;margin-left:auto;text-transform:uppercase;letter-spacing:0.03em}
+    .tool-result-badge.success{background:rgba(16,185,129,0.12);color:var(--green);border:1px solid rgba(16,185,129,0.2)}
+    .tool-result-badge.error{background:rgba(239,68,68,0.12);color:var(--red);border:1px solid rgba(239,68,68,0.2)}
+
+    /* Typing indicator - subtle */
+    .typing-indicator{display:flex;align-items:center;gap:16px;margin-bottom:32px}
+    .typing-dots{display:flex;gap:5px;padding:14px 18px;background:var(--surface-2);border:1px solid var(--border);border-radius:20px 20px 20px 4px}
+    .typing-dot{width:6px;height:6px;background:var(--text-muted);border-radius:50%;animation:typingBounce 1.4s infinite ease-in-out}
+    .typing-dot:nth-child(2){animation-delay:0.2s}
+    .typing-dot:nth-child(3){animation-delay:0.4s}
+    @keyframes typingBounce{0%,60%,100%{opacity:0.3;transform:translateY(0)}30%{opacity:0.9;transform:translateY(-3px)}}
+
+    /* Streaming cursor */
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:0.2}}
+    .streaming-cursor{color:var(--accent);animation:blink 1s infinite ease-in-out;font-weight:400}
+
+    /* Chat input area - clean and focused */
+    .chat-input-area{padding:20px 32px 24px;background:linear-gradient(to top,var(--bg) 85%,transparent);border-top:1px solid var(--border)}
+    .chat-input-container{max-width:900px;margin:0 auto;position:relative}
+    .chat-input-wrap{display:flex;align-items:flex-end;gap:0;background:var(--surface-2);border:1px solid var(--border-light);border-radius:16px;padding:6px;transition:all 0.15s ease;overflow:hidden}
+    .chat-input-wrap:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(99,102,241,0.12);background:var(--surface-3)}
+    .chat-input{flex:1;padding:12px 16px;background:none;border:none;color:var(--text);font-size:15px;font-family:'Inter',sans-serif;font-weight:400;resize:none;min-height:48px;max-height:200px;line-height:1.6;outline:none}
+    .chat-input::placeholder{color:var(--text-muted)}
+    .send-btn{padding:10px 20px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:10px;color:white;font-weight:700;font-size:14px;cursor:pointer;transition:all 0.2s;font-family:'DM Sans',sans-serif;display:flex;align-items:center;gap:6px;white-space:nowrap}
+    .send-btn:hover{opacity:0.9;transform:translateY(-1px)}
+    .send-btn:disabled{opacity:0.3;cursor:not-allowed;transform:none}
+    .send-btn svg{width:16px;height:16px}
+    .input-hint{text-align:center;margin-top:8px;font-size:11px;color:var(--text-muted)}
+
+    /* Empty state */
+    .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:40px}
+    .empty-icon{width:80px;height:80px;border-radius:24px;background:linear-gradient(135deg,rgba(124,58,237,0.12),rgba(59,130,246,0.12));border:1px solid rgba(124,58,237,0.2);display:flex;align-items:center;justify-content:center;font-size:36px;margin-bottom:24px}
+    .empty-state h2{font-family:'Space Grotesk',sans-serif;font-size:1.5rem;font-weight:700;letter-spacing:-0.5px;margin-bottom:8px;background:linear-gradient(135deg,var(--accent),var(--accent2),var(--accent3));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .empty-state p{color:var(--text-dim);font-size:15px;max-width:460px;margin-bottom:32px}
+    .quick-prompts{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:500px;width:100%}
+    .quick-prompt{padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;font-size:13px;color:var(--text-dim);cursor:pointer;text-align:left;transition:all 0.2s;font-family:'DM Sans',sans-serif}
+    .quick-prompt:hover{background:var(--surface-2);border-color:var(--border-light);color:var(--text);transform:translateY(-1px)}
+    .quick-prompt strong{display:block;color:var(--text);font-size:14px;margin-bottom:2px}
+
+    /* ─── Animated Agent Orb ─── */
+    .agent-orb{position:relative;width:40px;height:40px;flex-shrink:0}
+    .agent-orb-core{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;position:relative;z-index:2;transition:all 0.4s cubic-bezier(0.34,1.56,0.64,1)}
+    .agent-orb-ring{position:absolute;inset:-4px;border-radius:50%;border:2px solid transparent;z-index:1;transition:all 0.3s ease}
+    .agent-orb-glow{position:absolute;inset:-8px;border-radius:50%;z-index:0;opacity:0;transition:opacity 0.4s ease}
+
+    /* Orb states */
+    .agent-orb[data-state="idle"] .agent-orb-core{background:rgba(99,102,241,0.1);border:1.5px solid rgba(99,102,241,0.25)}
+    .agent-orb[data-state="idle"] .agent-orb-ring{border-color:rgba(99,102,241,0.08);animation:orbIdle 3s ease-in-out infinite}
+
+    .agent-orb[data-state="thinking"] .agent-orb-core{background:rgba(139,92,246,0.15);border:1.5px solid rgba(139,92,246,0.35)}
+    .agent-orb[data-state="thinking"] .agent-orb-ring{border-color:rgba(139,92,246,0.25);animation:orbThink 1.2s ease-in-out infinite}
+    .agent-orb[data-state="thinking"] .agent-orb-glow{opacity:1;background:radial-gradient(circle,rgba(139,92,246,0.12) 0%,transparent 70%);animation:orbGlow 1.2s ease-in-out infinite}
+
+    .agent-orb[data-state="working"] .agent-orb-core{background:rgba(59,130,246,0.15);border:1.5px solid rgba(59,130,246,0.35)}
+    .agent-orb[data-state="working"] .agent-orb-ring{border-top-color:rgba(59,130,246,0.5);border-right-color:rgba(139,92,246,0.3);animation:orbSpin 1.5s linear infinite}
+    .agent-orb[data-state="working"] .agent-orb-glow{opacity:1;background:radial-gradient(circle,rgba(59,130,246,0.1) 0%,transparent 70%);animation:orbGlow 1.5s ease-in-out infinite}
+
+    .agent-orb[data-state="success"] .agent-orb-core{background:rgba(16,185,129,0.15);border:1.5px solid rgba(16,185,129,0.35);animation:orbPop 0.5s cubic-bezier(0.34,1.56,0.64,1)}
+    .agent-orb[data-state="success"] .agent-orb-ring{border-color:rgba(16,185,129,0.3);animation:orbSuccessRing 0.6s ease-out}
+    .agent-orb[data-state="success"] .agent-orb-glow{opacity:1;background:radial-gradient(circle,rgba(16,185,129,0.15) 0%,transparent 70%)}
+
+    .agent-orb[data-state="error"] .agent-orb-core{background:rgba(239,68,68,0.15);border:1.5px solid rgba(239,68,68,0.35);animation:orbShake 0.4s ease}
+    .agent-orb[data-state="error"] .agent-orb-ring{border-color:rgba(239,68,68,0.3)}
+    .agent-orb[data-state="error"] .agent-orb-glow{opacity:1;background:radial-gradient(circle,rgba(239,68,68,0.12) 0%,transparent 70%)}
+
+    @keyframes orbIdle{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+    @keyframes orbThink{0%,100%{transform:scale(1);opacity:0.6}50%{transform:scale(1.08);opacity:1}}
+    @keyframes orbSpin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+    @keyframes orbGlow{0%,100%{transform:scale(1);opacity:0.5}50%{transform:scale(1.15);opacity:1}}
+    @keyframes orbPop{0%{transform:scale(0.9)}50%{transform:scale(1.12)}100%{transform:scale(1)}}
+    @keyframes orbSuccessRing{0%{transform:scale(0.8);opacity:0}50%{opacity:1}100%{transform:scale(1.3);opacity:0}}
+    @keyframes orbShake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-3px)}40%,80%{transform:translateX(3px)}}
+
+    /* ─── Live Status Ticker ─── */
+    .status-ticker{display:flex;align-items:center;gap:8px;padding:8px 24px;background:var(--surface);border-bottom:1px solid var(--border);font-size:12px;color:var(--text-muted);min-height:0;max-height:0;overflow:hidden;transition:all 0.3s cubic-bezier(0.4,0,0.2,1);opacity:0}
+    .status-ticker.active{min-height:36px;max-height:44px;padding:8px 24px;opacity:1}
+    .status-ticker .status-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;animation:statusPulse 1.5s ease-in-out infinite}
+    .status-ticker .status-dot.thinking{background:var(--accent2)}
+    .status-ticker .status-dot.working{background:var(--blue)}
+    .status-ticker .status-dot.success{background:var(--green);animation:none}
+    .status-ticker .status-dot.error{background:var(--red);animation:none}
+    .status-ticker .status-text{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.02em;animation:statusFadeIn 0.3s ease}
+    .status-ticker .status-time{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-subtle);font-variant-numeric:tabular-nums}
+    @keyframes statusPulse{0%,100%{opacity:1}50%{opacity:0.4}}
+    @keyframes statusFadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+
+    /* ─── Enhanced Chain of Thought ─── */
+    .cot-block{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-top:8px;transition:all 0.2s ease}
+    .cot-header{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;transition:background 0.15s;font-size:12px}
+    .cot-header:hover{background:var(--surface-2)}
+    .cot-icon{font-size:13px;width:20px;text-align:center}
+    .cot-name{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:11px;color:var(--text-secondary);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .cot-summary{font-size:11px;color:var(--text-muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .cot-badge{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:5px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em}
+    .cot-badge.running{background:rgba(245,158,11,0.1);color:var(--amber);border:1px solid rgba(245,158,11,0.2)}
+    .cot-badge.running .cot-spinner{width:8px;height:8px;border:1.5px solid var(--amber);border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite}
+    .cot-badge.done{background:rgba(16,185,129,0.1);color:var(--green);border:1px solid rgba(16,185,129,0.2)}
+    .cot-badge.error{background:rgba(239,68,68,0.1);color:var(--red);border:1px solid rgba(239,68,68,0.2)}
+    .cot-chevron{width:12px;height:12px;color:var(--text-subtle);transition:transform 0.2s ease;flex-shrink:0}
+    .cot-block.expanded .cot-chevron{transform:rotate(180deg)}
+    .cot-body{display:none;border-top:1px solid var(--border);padding:10px 12px;background:rgba(0,0,0,0.25);font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.6;color:var(--text-muted);max-height:180px;overflow-y:auto}
+    .cot-block.expanded .cot-body{display:block}
+    .cot-timing{font-size:10px;color:var(--text-subtle);margin-left:4px}
+    @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+
+    /* Tool icon mapping */
+    .cot-icon-search{color:var(--blue)}
+    .cot-icon-create{color:var(--green)}
+    .cot-icon-memory{color:var(--accent2)}
+    .cot-icon-report{color:var(--amber)}
+    .cot-icon-default{color:var(--text-muted)}
+
+    /* ─── Task Execution Panel ─── */
+    .exec-panel{width:0;overflow:hidden;background:var(--surface);border-left:1px solid var(--border);transition:width 0.3s cubic-bezier(0.4,0,0.2,1);flex-shrink:0;display:flex;flex-direction:column}
+    .exec-panel.open{width:340px}
+    .exec-panel-header{padding:16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+    .exec-panel-title{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;color:var(--text);flex:1}
+    .exec-panel-close{width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all 0.15s}
+    .exec-panel-close:hover{background:var(--surface-2);color:var(--text)}
+    .exec-panel-body{flex:1;overflow-y:auto;padding:16px}
+    .exec-task-info{margin-bottom:16px}
+    .exec-task-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px}
+    .exec-task-agent{font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:6px}
+    .exec-task-time{font-size:11px;color:var(--text-subtle);margin-top:4px;font-variant-numeric:tabular-nums;font-family:'JetBrains Mono',monospace}
+    .exec-log{font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.7;color:var(--text-muted)}
+    .exec-log-entry{padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
+    .exec-log-entry .log-time{color:var(--text-subtle);margin-right:8px}
+    .exec-log-entry .log-tool{color:var(--blue)}
+    .exec-log-entry .log-ok{color:var(--green)}
+    .exec-log-entry .log-err{color:var(--red)}
+    .exec-minimize-bar{padding:8px 16px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text-muted);cursor:pointer;transition:background 0.15s}
+    .exec-minimize-bar:hover{background:var(--surface-2)}
+    .exec-minimize-bar .exec-status-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:statusPulse 1.5s ease-in-out infinite}
+
+    @media(max-width:1200px){.exec-panel.open{width:280px}}
+    @media(max-width:768px){.exec-panel{display:none}}
+
+    /* Mobile hamburger */
+    .mobile-menu-btn{display:none;width:36px;height:36px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--text);cursor:pointer;align-items:center;justify-content:center;font-size:18px}
+
+    /* Responsive */
+    @media(max-width:768px){
+      .nav-sidebar{display:none}
+      .chat-sidebar{display:none;position:fixed;top:0;left:0;bottom:0;width:300px;z-index:200;box-shadow:8px 0 32px rgba(0,0,0,0.5)}
+      .chat-sidebar.mobile-open{display:flex}
+      .mobile-menu-btn{display:flex}
+      .mobile-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:199}
+      .mobile-overlay.active{display:block}
+      .messages-inner{padding:0 16px}
+      .chat-input-area{padding:12px 16px 16px}
+      .quick-prompts{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Icon nav sidebar -->
+    <nav class="nav-sidebar">
+      <a href="/" class="nav-logo"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></a>
+      <a href="/dashboard" class="nav-btn" title="Dashboard">📊<span class="tooltip">Dashboard</span></a>
+      <a href="/chat" class="nav-btn active" title="Chat">💬<span class="tooltip">Chat</span></a>
+      <a href="/tasks" class="nav-btn" title="Tasks">✅<span class="tooltip">Tasks</span></a>
+      <a href="/workflows" class="nav-btn" title="Workflows">🔄<span class="tooltip">Workflows</span></a>
+      <a href="/agent-factory" class="nav-btn" title="Agent Factory">🏭<span class="tooltip">Agent Factory</span></a>
+      <a href="/email" class="nav-btn" title="Email">📧<span class="tooltip">Email</span></a>
+      <a href="/reports" class="nav-btn" title="Reports">📋<span class="tooltip">Reports</span></a>
+      <div class="nav-spacer"></div>
+      <a href="/settings" class="nav-btn" title="Settings">⚙️<span class="tooltip">Settings</span></a>
+    </nav>
+
+    <!-- Chat conversation sidebar -->
+    <aside class="chat-sidebar" id="chatSidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title">Conversations</div>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <input type="text" id="convSearch" placeholder="Search..." style="flex:1;padding:8px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px" oninput="searchConversations()">
+          <select id="convSort" onchange="loadConversations()" style="padding:8px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;cursor:pointer">
+            <option value="recent">Recent</option>
+            <option value="oldest">Oldest</option>
+            <option value="alpha">A-Z</option>
+          </select>
+        </div>
+        <button class="new-chat-btn" onclick="createNewConversation()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New Chat
+        </button>
+      </div>
+      <div class="conversations-list" id="conversationsList">
+        <div class="conv-empty">Start a new conversation</div>
+      </div>
+    </aside>
+    <div class="mobile-overlay" id="mobileOverlay" onclick="closeMobileSidebar()"></div>
+
+    <!-- Main chat -->
+    <div class="chat-main">
+      <div class="chat-header">
+        <button class="mobile-menu-btn" onclick="toggleMobileSidebar()">☰</button>
+        <div class="agent-orb" id="agentOrb" data-state="idle">
+          <div class="agent-orb-glow"></div>
+          <div class="agent-orb-ring"></div>
+          <div class="agent-orb-core" id="currentAgentIcon">🤖</div>
+        </div>
+        <select class="agent-selector" id="agentSelector" onchange="handleAgentChange()">
+          <option value="">Loading agents...</option>
+        </select>
+        <div class="header-spacer"></div>
+        <button class="header-btn" id="execPanelToggle" onclick="toggleExecPanel()" title="Execution Log" style="display:none">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </button>
+      </div>
+
+      <!-- Live status ticker -->
+      <div class="status-ticker" id="statusTicker">
+        <div class="status-dot thinking" id="statusDot"></div>
+        <span class="status-text" id="statusText">Thinking...</span>
+        <span class="status-time" id="statusTime"></span>
+      </div>
+
+      <div class="chat-messages" id="chatMessages">
+        <div class="messages-inner" id="messagesInner">
+          <div class="empty-state" id="emptyState">
+            <div class="empty-icon">⚡</div>
+            <h2>What should we build today?</h2>
+            <p>Chat with your AI team — engineering, research, marketing, sales, and more. They're ready to work.</p>
+            <div class="quick-prompts">
+              <button class="quick-prompt" onclick="quickSend('Show me the status of all running tasks')">
+                <strong>📋 Task Status</strong>Check running tasks and recent activity
+              </button>
+              <button class="quick-prompt" onclick="quickSend('Research the top 3 competitors in our space')">
+                <strong>🔍 Competitive Research</strong>Analyze market positioning
+              </button>
+              <button class="quick-prompt" onclick="quickSend('Write a blog post about our latest product update')">
+                <strong>✍️ Content Creation</strong>Draft a blog post or social copy
+              </button>
+              <button class="quick-prompt" onclick="quickSend('Analyze our metrics and suggest improvements')">
+                <strong>📊 Analytics Review</strong>Deep dive into performance data
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chat-input-area">
+        <div class="chat-input-container">
+          <div class="chat-input-wrap">
+            <textarea id="chatInput" class="chat-input" placeholder="Message your AI team..." rows="1" onkeydown="handleKeyDown(event)"></textarea>
+            <button class="send-btn" onclick="sendMessage()" id="sendBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              Send
+            </button>
+          </div>
+          <div class="input-hint">Press Enter to send, Shift+Enter for new line</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Task Execution Panel -->
+    <aside class="exec-panel" id="execPanel">
+      <div class="exec-panel-header">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span class="exec-panel-title">Live Execution</span>
+        <button class="exec-panel-close" onclick="toggleExecPanel()">✕</button>
+      </div>
+      <div class="exec-panel-body" id="execPanelBody">
+        <div class="exec-task-info" id="execTaskInfo">
+          <div class="exec-task-title" id="execTaskTitle">No active task</div>
+          <div class="exec-task-agent" id="execTaskAgent"></div>
+          <div class="exec-task-time" id="execTaskTime"></div>
+        </div>
+        <div class="exec-log" id="execLog"></div>
+      </div>
+      <div class="exec-minimize-bar" onclick="toggleExecPanel()">
+        <div class="exec-status-dot" id="execStatusDot"></div>
+        <span>Minimize panel</span>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    // ── Config ──
+    marked.setOptions({
+      highlight: function(code, lang) {
+        if (lang && hljs.getLanguage(lang)) {
+          return hljs.highlight(code, { language: lang }).value;
+        }
+        return hljs.highlightAuto(code).value;
+      },
+      breaks: true,
+      gfm: true
+    });
+
+    // ── State ──
+    let currentConversationId = null;
+    let currentAgentId = null;
+    let agents = [];
+    let isTyping = false;
+    let agentState = 'idle'; // idle, thinking, working, success, error
+    let statusStartTime = null;
+    let statusTimer = null;
+    let execPanelOpen = false;
+    let execLogs = [];
+
+    // ── Agent Orb State Management ──
+    function setAgentState(state) {
+      agentState = state;
+      const orb = document.getElementById('agentOrb');
+      if (orb) orb.setAttribute('data-state', state);
+    }
+
+    function setStatusTicker(text, dotClass) {
+      const ticker = document.getElementById('statusTicker');
+      const statusText = document.getElementById('statusText');
+      const statusDot = document.getElementById('statusDot');
+      const statusTime = document.getElementById('statusTime');
+
+      if (text) {
+        ticker.classList.add('active');
+        statusText.textContent = text;
+        statusDot.className = 'status-dot ' + (dotClass || 'thinking');
+        if (!statusStartTime) {
+          statusStartTime = Date.now();
+          statusTimer = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - statusStartTime) / 1000);
+            statusTime.textContent = elapsed < 60 ? elapsed + 's' : Math.floor(elapsed/60) + 'm ' + (elapsed%60) + 's';
+          }, 1000);
+        }
+      } else {
+        ticker.classList.remove('active');
+        statusStartTime = null;
+        if (statusTimer) { clearInterval(statusTimer); statusTimer = null; }
+        statusTime.textContent = '';
+      }
+    }
+
+    function addExecLog(text, type) {
+      const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const typeClass = type === 'tool' ? 'log-tool' : type === 'ok' ? 'log-ok' : type === 'error' ? 'log-err' : '';
+      execLogs.push({ time, text, typeClass });
+      const logEl = document.getElementById('execLog');
+      if (logEl) {
+        logEl.innerHTML += `<div class="exec-log-entry"><span class="log-time">${time}</span> <span class="${typeClass}">${escapeHtml(text)}</span></div>`;
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+    }
+
+    function toggleExecPanel() {
+      execPanelOpen = !execPanelOpen;
+      document.getElementById('execPanel').classList.toggle('open', execPanelOpen);
+    }
+
+    // Tool icon mapping for chain of thought
+    const TOOL_ICONS = {
+      create_task: { icon: '📝', cls: 'cot-icon-create', label: 'Creating task' },
+      get_tasks: { icon: '📋', cls: 'cot-icon-search', label: 'Fetching tasks' },
+      search_memory: { icon: '🧠', cls: 'cot-icon-memory', label: 'Searching memory' },
+      read_memory: { icon: '🧠', cls: 'cot-icon-memory', label: 'Reading memory' },
+      update_memory: { icon: '💾', cls: 'cot-icon-memory', label: 'Updating memory' },
+      create_report: { icon: '📊', cls: 'cot-icon-report', label: 'Creating report' },
+      query_reports: { icon: '🔎', cls: 'cot-icon-search', label: 'Querying reports' },
+      web_search: { icon: '🌐', cls: 'cot-icon-search', label: 'Searching web' },
+      get_company_documents: { icon: '📄', cls: 'cot-icon-search', label: 'Loading documents' },
+      update_document: { icon: '✏️', cls: 'cot-icon-create', label: 'Updating document' },
+      send_email: { icon: '📧', cls: 'cot-icon-create', label: 'Sending email' },
+      get_inbox: { icon: '📬', cls: 'cot-icon-search', label: 'Checking inbox' },
+      get_context: { icon: '📖', cls: 'cot-icon-search', label: 'Loading context' },
+      score_task: { icon: '⭐', cls: 'cot-icon-report', label: 'Scoring task' },
+      create_learning: { icon: '💡', cls: 'cot-icon-create', label: 'Saving learning' },
+    };
+
+    function getToolMeta(name) {
+      return TOOL_ICONS[name] || { icon: '🔧', cls: 'cot-icon-default', label: name.replace(/_/g, ' ') };
+    }
+
+    // ── Utilities ──
+    function showToast(msg, type = 'success') {
+      const container = document.getElementById('toastContainer') || (() => {
+        const c = document.createElement('div');
+        c.id = 'toastContainer';
+        c.style.cssText = 'position:fixed;top:20px;right:20px;z-index:10000;display:flex;flex-direction:column;gap:8px';
+        document.body.appendChild(c);
+        return c;
+      })();
+      const toast = document.createElement('div');
+      toast.style.cssText = 'padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;backdrop-filter:blur(12px);animation:slideIn 0.3s ease;border:1px solid var(--border);max-width:400px';
+      if (type === 'success') {
+        toast.style.background = 'rgba(0,229,153,0.15)';
+        toast.style.color = 'var(--accent)';
+      } else if (type === 'error') {
+        toast.style.background = 'rgba(239,68,68,0.15)';
+        toast.style.color = 'var(--red)';
+      }
+      toast.textContent = msg;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
+
+    // ── Init ──
+    async function init() {
+      try {
+        const agentsRes = await fetch('/api/agents');
+        if (!agentsRes.ok) { window.location.href = '/login'; return; }
+        const agentsData = await agentsRes.json();
+        agents = agentsData.agents || agentsData || [];
+
+        const sel = document.getElementById('agentSelector');
+        sel.innerHTML = agents.map(a =>
+          `<option value="${a.id}">${a.icon || '🤖'} ${a.name}</option>`
+        ).join('');
+
+        if (agents.length > 0) {
+          // Default to CEO agent if exists
+          const ceo = agents.find(a => a.type === 'ceo' || a.name.toLowerCase().includes('ceo'));
+          currentAgentId = ceo ? ceo.id : agents[0].id;
+          sel.value = currentAgentId;
+          updateAgentIcon();
+        }
+
+        await loadConversations();
+      } catch (e) {
+        console.error('Init error:', e);
+      }
+    }
+
+    // ── Conversations ──
+    async function loadConversations() {
+      try {
+        const res = await fetch('/api/chat/conversations');
+        const data = await res.json();
+        let conversations = data.conversations || [];
+        const list = document.getElementById('conversationsList');
+
+        if (conversations.length === 0) {
+          list.innerHTML = '<div class="conv-empty">No conversations yet.<br>Start a new chat!</div>';
+          return;
+        }
+
+        // Apply sorting
+        const sortType = document.getElementById('convSort')?.value || 'recent';
+        if (sortType === 'recent') {
+          conversations.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        } else if (sortType === 'oldest') {
+          conversations.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        } else if (sortType === 'alpha') {
+          conversations.sort((a, b) => (a.title || 'New conversation').localeCompare(b.title || 'New conversation'));
+        }
+
+        // Filter by search
+        const searchVal = document.getElementById('convSearch')?.value?.toLowerCase() || '';
+        if (searchVal) {
+          conversations = conversations.filter(c =>
+            (c.title || 'New conversation').toLowerCase().includes(searchVal)
+          );
+        }
+
+        // Group by date (only for recent sort)
+        const grouped = {};
+        if (sortType === 'recent' && !searchVal) {
+          conversations.forEach(c => {
+            const d = new Date(c.created_at);
+            const today = new Date();
+            const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+            let label;
+            if (d.toDateString() === today.toDateString()) label = 'Today';
+            else if (d.toDateString() === yesterday.toDateString()) label = 'Yesterday';
+            else label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            if (!grouped[label]) grouped[label] = [];
+            grouped[label].push(c);
+          });
+        } else {
+          // Single group for other sorts
+          grouped['Results'] = conversations;
+        }
+
+        let html = '';
+        for (const [label, convs] of Object.entries(grouped)) {
+          if (sortType === 'recent' && !searchVal) {
+            html += `<div class="conv-date-group">${label}</div>`;
+          }
+          convs.forEach(c => {
+            const agent = agents.find(a => a.id === c.agent_id);
+            const time = new Date(c.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+            html += `
+              <div class="conversation-item ${c.id === currentConversationId ? 'active' : ''}" onclick="loadConversation(${c.id})" style="display:flex;align-items:center;gap:10px;position:relative;padding:10px 12px;margin-bottom:2px;border-radius:10px;cursor:pointer">
+                <span class="conv-icon">${agent?.icon || '🤖'}</span>
+                <div class="conv-info" style="flex:1;min-width:0">
+                  <div class="conv-title">${escapeHtml(c.title || 'New conversation')}</div>
+                  <div class="conv-time">${time}</div>
+                </div>
+                <button class="conv-delete-btn" onclick="event.stopPropagation();deleteConversation(${c.id})" style="opacity:0;width:24px;height:24px;border-radius:6px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#ef4444;font-size:14px;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;justify-content:center">×</button>
+              </div>`;
+          });
+        }
+        list.innerHTML = html;
+      } catch (e) {
+        console.error('Load conversations error:', e);
+      }
+    }
+
+    function searchConversations() {
+      loadConversations();
+    }
+
+    async function deleteConversation(convId) {
+      if (!confirm('Delete this conversation? This cannot be undone.')) return;
+      try {
+        const res = await fetch(`/api/chat/conversations/${convId}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Delete failed');
+        if (currentConversationId === convId) {
+          currentConversationId = null;
+          document.getElementById('messagesInner').innerHTML = `
+            <div class="empty-state">
+              <div class="empty-icon">💬</div>
+              <h2>Start a conversation</h2>
+              <p>Select an existing conversation or create a new one.</p>
+            </div>`;
+        }
+        await loadConversations();
+        showToast('Conversation deleted');
+      } catch (e) {
+        showToast('Failed to delete conversation', 'error');
+      }
+    }
+
+    async function createNewConversation() {
+      currentConversationId = null;
+      const inner = document.getElementById('messagesInner');
+      inner.innerHTML = `
+        <div class="empty-state" id="emptyState">
+          <div class="empty-icon">💬</div>
+          <h2>New conversation</h2>
+          <p>Send a message to start chatting with your AI team.</p>
+        </div>`;
+      await loadConversations();
+      closeMobileSidebar();
+    }
+
+    async function loadConversation(convId) {
+      currentConversationId = convId;
+      closeMobileSidebar();
+      await loadConversations();
+
+      try {
+        const res = await fetch(`/api/chat/conversations/${convId}/messages`);
+        const data = await res.json();
+        const messages = data.messages || [];
+        renderMessages(messages);
+      } catch (e) {
+        console.error('Load conversation error:', e);
+      }
+    }
+
+    // ── Render Messages ──
+    function renderMessages(messages) {
+      const inner = document.getElementById('messagesInner');
+      inner.innerHTML = messages.map(m => buildMessageHtml(m)).join('');
+      addCodeBlockButtons();
+      scrollToBottom();
+    }
+
+    function buildMessageHtml(m) {
+      const isUser = m.role === 'user';
+      const agent = agents.find(a => a.id === m.agent_id);
+      const time = new Date(m.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      const content = isUser ? escapeHtml(m.content || '') : renderMarkdown(m.content || '');
+
+      let toolsHtml = '';
+      if (m.tool_calls && m.tool_calls.length > 0) {
+        toolsHtml = '<div class="tool-calls-container">' + m.tool_calls.map((tc, i) => {
+          const name = tc.function?.name || tc.name || 'tool_call';
+          const meta = getToolMeta(name);
+          const args = tc.function?.arguments ? tryPrettyJSON(tc.function.arguments) : '';
+          const result = (m.tool_results && m.tool_results[i]) ? m.tool_results[i] : null;
+          const resultStr = result ? (typeof result === 'string' ? result : JSON.stringify(result, null, 2)) : '';
+          const summary = resultStr ? '→ ' + resultStr.substring(0, 80).replace(/[{}\[\]"]/g, '').trim() : '';
+          return `
+            <div class="cot-block" onclick="this.classList.toggle('expanded')">
+              <div class="cot-header">
+                <span class="cot-icon ${meta.cls}">${meta.icon}</span>
+                <span class="cot-name">${escapeHtml(meta.label)}</span>
+                <span class="cot-summary">${escapeHtml(summary)}</span>
+                ${result ? '<span class="cot-badge done">✓ Done</span>' : '<span class="cot-badge running">⟳ Called</span>'}
+                <svg class="cot-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+              </div>
+              <div class="cot-body"><pre style="white-space:pre-wrap;word-break:break-word">${escapeHtml(args)}${resultStr ? '\n───\n' + escapeHtml(resultStr.substring(0, 1000)) : ''}</pre></div>
+            </div>`;
+        }).join('') + '</div>';
+      }
+
+      return `
+        <div class="message ${isUser ? 'user' : 'agent'}">
+          <div class="message-avatar">${isUser ? '👤' : (agent?.icon || '🤖')}</div>
+          <div class="message-body">
+            <div class="message-meta">
+              <span class="message-name">${isUser ? 'You' : (agent?.name || 'Agent')}</span>
+              <span class="message-time">${time}</span>
+            </div>
+            <div class="message-bubble">${content}</div>
+            ${toolsHtml}
+          </div>
+        </div>`;
+    }
+
+    function renderMarkdown(text) {
+      if (!text) return '';
+      try {
+        return marked.parse(text);
+      } catch (e) {
+        return escapeHtml(text).replace(/\n/g, '<br>');
+      }
+    }
+
+    function tryPrettyJSON(str) {
+      try {
+        return JSON.stringify(JSON.parse(str), null, 2);
+      } catch { return str || ''; }
+    }
+
+    // ── Code Block Buttons ──
+    function addCodeBlockButtons() {
+      document.querySelectorAll('.message-bubble pre').forEach(pre => {
+        if (pre.querySelector('.code-header')) return;
+        const code = pre.querySelector('code');
+        const lang = code?.className?.match(/language-(\w+)/)?.[1] || 'code';
+        const header = document.createElement('div');
+        header.className = 'code-header';
+        header.innerHTML = `<span>${lang}</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button>`;
+        pre.insertBefore(header, pre.firstChild);
+      });
+    }
+
+    function copyCode(btn) {
+      const code = btn.closest('pre').querySelector('code');
+      navigator.clipboard.writeText(code.textContent).then(() => {
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+      });
+    }
+
+    // ── Agents ──
+    function handleAgentChange() {
+      currentAgentId = parseInt(document.getElementById('agentSelector').value);
+      updateAgentIcon();
+    }
+
+    function updateAgentIcon() {
+      const agent = agents.find(a => a.id === currentAgentId);
+      if (agent) {
+        document.getElementById('currentAgentIcon').textContent = agent.icon || '🤖';
+        setAgentState('idle');
+      }
+    }
+
+    // ── Send Message ──
+    async function sendMessage() {
+      const input = document.getElementById('chatInput');
+      const message = input.value.trim();
+      if (!message || isTyping) return;
+
+      const sendBtn = document.getElementById('sendBtn');
+      sendBtn.disabled = true;
+      input.value = '';
+      input.style.height = 'auto';
+
+      try {
+        // Create conversation if needed
+        if (!currentConversationId) {
+          const createRes = await fetch('/api/chat/conversations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ agent_id: currentAgentId, title: message.slice(0, 50) })
+          });
+          const createData = await createRes.json();
+          currentConversationId = createData.conversation.id;
+          // Clear empty state
+          const inner = document.getElementById('messagesInner');
+          const emptyState = inner.querySelector('.empty-state');
+          if (emptyState) emptyState.remove();
+          await loadConversations();
+        }
+
+        // Add user message to UI
+        appendMessage('user', message, currentAgentId);
+
+        // Show typing
+        isTyping = true;
+        showTypingIndicator();
+
+        // SSE stream
+        const streamUrl = `/api/chat/conversations/${currentConversationId}/stream?message=${encodeURIComponent(message)}${currentAgentId ? '&agent_id=' + currentAgentId : ''}`;
+        const agent = agents.find(a => a.id === currentAgentId);
+        const msgEl = createStreamingMessage(agent);
+        const eventSource = new EventSource(streamUrl);
+        let fullContent = '';
+        let toolCallCount = 0;
+
+        // Set thinking state
+        setAgentState('thinking');
+        setStatusTicker('Thinking...', 'thinking');
+        addExecLog('Message sent, agent thinking...', 'tool');
+        document.getElementById('execPanelToggle').style.display = '';
+        document.getElementById('execTaskTitle').textContent = message.substring(0, 60) + (message.length > 60 ? '...' : '');
+        document.getElementById('execTaskAgent').innerHTML = `${agent?.icon || '🤖'} ${agent?.name || 'Agent'}`;
+
+        eventSource.onmessage = function(event) {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'content') {
+              if (agentState === 'thinking') {
+                setAgentState('working');
+                setStatusTicker('Generating response...', 'working');
+              }
+              fullContent += data.content;
+              updateStreamingMessage(msgEl, fullContent);
+            } else if (data.type === 'tool_start') {
+              toolCallCount++;
+              setAgentState('working');
+              const toolNames = data.tools || [];
+              const label = toolNames.map(t => {
+                const name = typeof t === 'string' ? t : (t.name || 'tool');
+                return getToolMeta(name).label;
+              }).join(', ');
+              setStatusTicker(label + '...', 'working');
+              appendToolCall(msgEl, toolNames);
+              toolNames.forEach(t => {
+                const name = typeof t === 'string' ? t : (t.name || 'tool');
+                addExecLog(`→ ${getToolMeta(name).label}`, 'tool');
+              });
+            } else if (data.type === 'tool_result') {
+              appendToolResult(msgEl, data.tool, data.result);
+              const meta = getToolMeta(data.tool);
+              addExecLog(`✓ ${meta.label} complete`, 'ok');
+              setStatusTicker('Processing results...', 'thinking');
+            } else if (data.type === 'agent_thinking') {
+              setAgentState('thinking');
+              setStatusTicker('Thinking...', 'thinking');
+            } else if (data.type === 'tool_call_start') {
+              const meta = getToolMeta(data.tool);
+              setStatusTicker(meta.label + '...', 'working');
+            } else if (data.type === 'done') {
+              setAgentState('success');
+              setStatusTicker('Done', 'success');
+              addExecLog('Response complete', 'ok');
+              setTimeout(() => { setAgentState('idle'); setStatusTicker(null); }, 2500);
+              finishStreaming(msgEl, fullContent, sendBtn, input);
+              eventSource.close();
+            } else if (data.type === 'error') {
+              setAgentState('error');
+              setStatusTicker('Error occurred', 'error');
+              addExecLog('Error: ' + (data.error || 'Unknown'), 'error');
+              setTimeout(() => { setAgentState('idle'); setStatusTicker(null); }, 3000);
+              finishStreaming(msgEl, fullContent || ('Error: ' + data.error), sendBtn, input);
+              eventSource.close();
+            }
+          } catch (e) { console.error('Stream parse error:', e); }
+        };
+
+        eventSource.onerror = function() {
+          eventSource.close();
+          if (!fullContent) {
+            setAgentState('error');
+            setStatusTicker(null);
+            hideTypingIndicator();
+            fallbackSendMessage(currentConversationId, message, currentAgentId, sendBtn, input);
+          } else {
+            setAgentState('success');
+            setTimeout(() => { setAgentState('idle'); setStatusTicker(null); }, 2500);
+            finishStreaming(msgEl, fullContent, sendBtn, input);
+          }
+        };
+      } catch (e) {
+        console.error('Send error:', e);
+        hideTypingIndicator();
+        isTyping = false;
+        sendBtn.disabled = false;
+      }
+    }
+
+    function quickSend(text) {
+      document.getElementById('chatInput').value = text;
+      sendMessage();
+    }
+
+    // ── Streaming Helpers ──
+    function createStreamingMessage(agent) {
+      const inner = document.getElementById('messagesInner');
+      const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      const el = document.createElement('div');
+      el.className = 'message agent';
+      el.innerHTML = `
+        <div class="message-avatar">${agent?.icon || '🤖'}</div>
+        <div class="message-body">
+          <div class="message-meta">
+            <span class="message-name">${agent?.name || 'Agent'}</span>
+            <span class="message-time">${time}</span>
+          </div>
+          <div class="message-bubble"><span class="streaming-cursor">▊</span></div>
+        </div>`;
+      inner.appendChild(el);
+      scrollToBottom();
+      return el;
+    }
+
+    function updateStreamingMessage(el, content) {
+      const bubble = el.querySelector('.message-bubble');
+      bubble.innerHTML = renderMarkdown(content) + '<span class="streaming-cursor">▊</span>';
+      addCodeBlockButtons();
+      scrollToBottom();
+    }
+
+    function finishStreaming(el, content, sendBtn, input) {
+      hideTypingIndicator();
+      isTyping = false;
+      sendBtn.disabled = false;
+      const bubble = el.querySelector('.message-bubble');
+      bubble.innerHTML = renderMarkdown(content);
+      addCodeBlockButtons();
+      scrollToBottom();
+      input.focus();
+    }
+
+    function appendToolCall(msgEl, tools) {
+      const body = msgEl.querySelector('.message-body');
+      let container = body.querySelector('.tool-calls-container');
+      if (!container) { container = document.createElement('div'); container.className = 'tool-calls-container'; body.appendChild(container); }
+      tools.forEach(t => {
+        const name = typeof t === 'string' ? t : (t.name || 'tool');
+        const meta = getToolMeta(name);
+        const block = document.createElement('div');
+        block.className = 'cot-block';
+        block.setAttribute('data-tool', name);
+        block.setAttribute('data-start', Date.now());
+        block.innerHTML = `
+          <div class="cot-header" onclick="this.parentElement.classList.toggle('expanded')">
+            <span class="cot-icon ${meta.cls}">${meta.icon}</span>
+            <span class="cot-name">${escapeHtml(meta.label)}</span>
+            <span class="cot-summary" id="cotSummary_${Date.now()}"></span>
+            <span class="cot-badge running"><span class="cot-spinner"></span> Running</span>
+            <svg class="cot-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div class="cot-body"><span style="color:var(--text-subtle)">Executing ${escapeHtml(name)}...</span></div>`;
+        container.appendChild(block);
+      });
+      scrollToBottom();
+    }
+
+    function appendToolResult(msgEl, toolName, result) {
+      const container = msgEl.querySelector('.tool-calls-container');
+      if (!container) return;
+      // Find the last running block
+      const blocks = container.querySelectorAll('.cot-block');
+      let block = null;
+      for (let i = blocks.length - 1; i >= 0; i--) {
+        const badge = blocks[i].querySelector('.cot-badge');
+        if (badge && badge.classList.contains('running')) { block = blocks[i]; break; }
+      }
+      if (!block) block = blocks[blocks.length - 1];
+      if (!block) return;
+
+      // Update badge
+      const badge = block.querySelector('.cot-badge');
+      if (badge) { badge.className = 'cot-badge done'; badge.innerHTML = '✓ Done'; }
+
+      // Calculate timing
+      const startTime = parseInt(block.getAttribute('data-start') || Date.now());
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      const timingSpan = document.createElement('span');
+      timingSpan.className = 'cot-timing';
+      timingSpan.textContent = elapsed + 's';
+      badge.parentElement.insertBefore(timingSpan, badge.parentElement.querySelector('.cot-chevron'));
+
+      // Set summary text
+      const summary = block.querySelector('.cot-summary');
+      if (summary) {
+        const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
+        const short = resultStr.substring(0, 80).replace(/[{}\[\]"]/g, '').trim();
+        summary.textContent = '→ ' + (short || 'Completed');
+      }
+
+      // Set body with result details
+      const body = block.querySelector('.cot-body');
+      if (body) {
+        const resultStr = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+        body.innerHTML = '<pre style="white-space:pre-wrap;word-break:break-word">' + escapeHtml(resultStr.substring(0, 1000)) + '</pre>';
+      }
+    }
+
+    async function fallbackSendMessage(convId, message, agentId, sendBtn, input) {
+      try {
+        const res = await fetch(`/api/chat/conversations/${convId}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message, agent_id: agentId })
+        });
+        const data = await res.json();
+        if (data.reply) appendMessage('assistant', data.reply.content, data.reply.agent_id);
+      } catch (e) { console.error('Fallback error:', e); }
+      isTyping = false;
+      sendBtn.disabled = false;
+      input.focus();
+    }
+
+    // ── Append message ──
+    function appendMessage(role, content, agentId) {
+      const inner = document.getElementById('messagesInner');
+      const emptyState = inner.querySelector('.empty-state');
+      if (emptyState) emptyState.remove();
+
+      const isUser = role === 'user';
+      const agent = agents.find(a => a.id === agentId);
+      const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      const rendered = isUser ? escapeHtml(content) : renderMarkdown(content);
+
+      const el = document.createElement('div');
+      el.className = `message ${isUser ? 'user' : 'agent'}`;
+      el.innerHTML = `
+        <div class="message-avatar">${isUser ? '👤' : (agent?.icon || '🤖')}</div>
+        <div class="message-body">
+          <div class="message-meta">
+            <span class="message-name">${isUser ? 'You' : (agent?.name || 'Agent')}</span>
+            <span class="message-time">${time}</span>
+          </div>
+          <div class="message-bubble">${rendered}</div>
+        </div>`;
+      inner.appendChild(el);
+      if (!isUser) addCodeBlockButtons();
+      scrollToBottom();
+    }
+
+    // ── Typing indicator ──
+    function showTypingIndicator() {
+      const inner = document.getElementById('messagesInner');
+      const agent = agents.find(a => a.id === currentAgentId);
+      const el = document.createElement('div');
+      el.className = 'typing-indicator';
+      el.id = 'typingIndicator';
+      el.innerHTML = `
+        <div class="message-avatar" style="background:linear-gradient(135deg,rgba(20,184,166,0.15),rgba(59,130,246,0.15));border:1px solid rgba(20,184,166,0.2);width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px">${agent?.icon || '🤖'}</div>
+        <div class="typing-dots"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>`;
+      inner.appendChild(el);
+      scrollToBottom();
+    }
+
+    function hideTypingIndicator() {
+      const el = document.getElementById('typingIndicator');
+      if (el) el.remove();
+    }
+
+    // ── Utilities ──
+    function scrollToBottom() {
+      const container = document.getElementById('chatMessages');
+      requestAnimationFrame(() => { container.scrollTop = container.scrollHeight; });
+    }
+
+    function escapeHtml(str) {
+      return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function handleKeyDown(e) {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    }
+
+    // Auto-resize textarea
+    document.getElementById('chatInput').addEventListener('input', function() {
+      this.style.height = 'auto';
+      this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+    });
+
+    // Mobile sidebar
+    function toggleMobileSidebar() {
+      document.getElementById('chatSidebar').classList.toggle('mobile-open');
+      document.getElementById('mobileOverlay').classList.toggle('active');
+    }
+    function closeMobileSidebar() {
+      document.getElementById('chatSidebar').classList.remove('mobile-open');
+      document.getElementById('mobileOverlay').classList.remove('active');
+    }
+
+    // Initialize
+    init();
+  </script>
+<script src="/sidebar.js"></script>
+</body>
+</html>

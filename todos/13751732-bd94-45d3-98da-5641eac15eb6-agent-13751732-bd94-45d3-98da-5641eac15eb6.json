@@ -1,0 +1,52 @@
+[
+  {
+    "content": "Verify and fix chat interface integration with new API",
+    "status": "completed",
+    "activeForm": "Verifying chat interface integration"
+  },
+  {
+    "content": "Test onboarding flow (signup → wizard → chat)",
+    "status": "in_progress",
+    "activeForm": "Testing onboarding flow"
+  },
+  {
+    "content": "Verify dashboard displays real data from new APIs",
+    "status": "pending",
+    "activeForm": "Verifying dashboard data display"
+  },
+  {
+    "content": "Test task creation and execution flow",
+    "status": "pending",
+    "activeForm": "Testing task execution"
+  },
+  {
+    "content": "Add missing UI pages (analytics, workflows, email inbox)",
+    "status": "pending",
+    "activeForm": "Building missing UI pages"
+  },
+  {
+    "content": "Test agent factory (create custom agent)",
+    "status": "pending",
+    "activeForm": "Testing agent factory"
+  },
+  {
+    "content": "Verify skills and learnings systems work",
+    "status": "pending",
+    "activeForm": "Verifying skills and learnings"
+  },
+  {
+    "content": "Test memory search across 3 layers",
+    "status": "pending",
+    "activeForm": "Testing memory system"
+  },
+  {
+    "content": "Polish: mobile responsive, error handling, loading states",
+    "status": "pending",
+    "activeForm": "Polishing UI and UX"
+  },
+  {
+    "content": "Final verification against definition of done",
+    "status": "pending",
+    "activeForm": "Final verification"
+  }
+]

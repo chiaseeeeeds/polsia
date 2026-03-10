@@ -1,17 +1,10 @@
 services:
-  - type: worker
-    name: polsia-worker
+  - type: web
     runtime: node
-    buildCommand: npm install && npm run build
-    startCommand: npm run worker:start
+    name: app
+    buildCommand: npm install
+    startCommand: npm run migrate && npm start
+    healthCheckPath: /health
     envVars:
-      - key: DATABASE_URL
-        sync: false
-      - key: ANTHROPIC_API_KEY
-        sync: false
-      - key: RESEND_API_KEY
-        sync: false
-      - key: BRAVE_SEARCH_API_KEY
-        sync: false
       - key: NODE_ENV
         value: production

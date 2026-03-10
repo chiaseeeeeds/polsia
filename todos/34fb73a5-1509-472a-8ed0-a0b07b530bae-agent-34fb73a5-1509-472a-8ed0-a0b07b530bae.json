@@ -1,0 +1,22 @@
+[
+  {
+    "content": "Phase 1: Database schema + backend server + all APIs",
+    "status": "completed",
+    "activeForm": "Building database schema and migrations"
+  },
+  {
+    "content": "Phase 2: Premium landing page",
+    "status": "completed",
+    "activeForm": "Building premium landing page"
+  },
+  {
+    "content": "Phase 3: Auth pages + Dashboard + all app pages",
+    "status": "completed",
+    "activeForm": "Building all application pages"
+  },
+  {
+    "content": "Phase 4: Deploy and verify end-to-end",
+    "status": "in_progress",
+    "activeForm": "Deploying and verifying"
+  }
+]

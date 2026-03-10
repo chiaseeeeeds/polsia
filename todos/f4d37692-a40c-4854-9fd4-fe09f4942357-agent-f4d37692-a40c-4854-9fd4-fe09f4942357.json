@@ -1,0 +1,37 @@
+[
+  {
+    "content": "Phase 1: Database + Chat + LLM + Worker",
+    "status": "completed",
+    "activeForm": "Completing Phase 1"
+  },
+  {
+    "content": "Phase 2: Enhanced agents + auto-docs",
+    "status": "completed",
+    "activeForm": "Completing Phase 2"
+  },
+  {
+    "content": "Deploy to production",
+    "status": "completed",
+    "activeForm": "Deploying"
+  },
+  {
+    "content": "Verify deployment health",
+    "status": "completed",
+    "activeForm": "Verifying deployment"
+  },
+  {
+    "content": "Test critical path: signup → onboarding → chat → LLM response",
+    "status": "in_progress",
+    "activeForm": "Testing critical path"
+  },
+  {
+    "content": "Polish dashboard to show real data",
+    "status": "pending",
+    "activeForm": "Polishing dashboard"
+  },
+  {
+    "content": "Final verification and summary",
+    "status": "pending",
+    "activeForm": "Final verification"
+  }
+]

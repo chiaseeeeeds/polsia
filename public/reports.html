@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reports — Runloop</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{--bg:#08090d;--surface:#0f1117;--surface-2:#151821;--surface-3:#1a1e2a;--border:#1a1d27;--border-light:#252838;--text:#e8e9ed;--text-dim:#7a7f8e;--text-muted:#4a4f5e;--accent:#00e599;--accent-dim:rgba(0,229,153,0.12);--accent-glow:rgba(0,229,153,0.25);--purple:#8b5cf6;--blue:#6366f1;--amber:#f59e0b;--red:#ef4444;--cyan:#06b6d4;--sidebar-w:260px}
+        body{font-family:'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
+        body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0}
+        a{color:inherit;text-decoration:none}input,select,textarea,button{font-family:inherit}
+        .app{display:flex;min-height:100vh;position:relative;z-index:1}
+        .sidebar{width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);padding:0;display:flex;flex-direction:column;position:fixed;top:0;bottom:0;left:0;z-index:50;transition:transform 0.3s cubic-bezier(.4,0,.2,1)}
+        .sidebar-header{padding:20px 20px 18px;border-bottom:1px solid var(--border)}
+        .logo{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px;letter-spacing:-0.5px;display:flex;align-items:center;gap:10px}
+        .logo-mark{width:30px;height:30px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .logo-mark svg{width:16px;height:16px}
+        .sidebar-nav{flex:1;padding:12px 12px 0;overflow-y:auto}
+        .nav-section{margin-bottom:16px}
+        .nav-section-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1.8px;color:var(--text-muted);padding:8px 12px 6px}
+        .nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:14px;font-weight:500;color:var(--text-dim);transition:all 0.15s;cursor:pointer}
+        .nav-item:hover{color:var(--text);background:var(--surface-2)}
+        .nav-item.active{color:var(--accent);background:var(--accent-dim)}
+        .nav-item .icon{width:20px;text-align:center;font-size:15px;flex-shrink:0}
+        .sidebar-footer{padding:12px 16px;border-top:1px solid var(--border)}
+        .user-pill{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;transition:background 0.15s;cursor:pointer;position:relative}
+        .user-pill:hover{background:var(--surface-2)}
+        .user-avatar{width:34px;height:34px;border-radius:8px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--accent);flex-shrink:0}
+        .user-info{flex:1;min-width:0}
+        .user-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .user-email{font-size:11px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .user-dropdown{position:absolute;bottom:calc(100% + 8px);left:0;right:0;background:var(--surface-2);border:1px solid var(--border-light);border-radius:10px;padding:6px;display:none;box-shadow:0 -8px 32px rgba(0,0,0,0.4);z-index:60}
+        .user-dropdown.open{display:block}
+        .user-dropdown-item{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:6px;font-size:13px;color:var(--text-dim);cursor:pointer;transition:all 0.12s;border:none;background:none;width:100%;text-align:left}
+        .user-dropdown-item:hover{background:var(--surface-3);color:var(--text)}
+        .user-dropdown-item.danger{color:var(--red)}
+
+        .main{flex:1;margin-left:var(--sidebar-w);padding:32px 40px 48px;min-height:100vh}
+        .page-header{margin-bottom:32px}
+        .page-header h1{font-family:'Space Grotesk',sans-serif;font-size:1.85rem;font-weight:700;letter-spacing:-0.5px;margin-bottom:4px}
+        .page-header p{color:var(--text-dim);font-size:0.95rem}
+
+        .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s}
+        .btn-primary{padding:10px 22px;background:var(--accent);color:#08090d}
+        .btn-primary:hover{opacity:0.9;box-shadow:0 4px 16px var(--accent-glow)}
+        .btn-ghost{padding:6px 12px;background:none;color:var(--text-dim);border:1px solid var(--border)}
+        .btn-ghost:hover{color:var(--text);border-color:var(--border-light)}
+
+        /* Reports layout */
+        .reports-layout{display:grid;grid-template-columns:340px 1fr;gap:0;height:calc(100vh - 140px);border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--surface)}
+        .reports-list{border-right:1px solid var(--border);overflow-y:auto}
+        .reports-list-header{padding:16px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:5}
+        .reports-list-header input{width:100%;padding:9px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;outline:none}
+        .reports-list-header input:focus{border-color:var(--accent)}
+        .report-item{padding:16px 20px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.15s}
+        .report-item:hover{background:var(--surface-2)}
+        .report-item.active{background:var(--accent-dim);border-left:3px solid var(--accent)}
+        .report-item-title{font-size:14px;font-weight:600;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .report-item-meta{display:flex;gap:12px;font-size:12px;color:var(--text-muted)}
+        .report-type-badge{font-size:10px;padding:2px 6px;border-radius:4px;background:var(--surface-3);color:var(--text-dim);font-weight:600;text-transform:uppercase}
+        .report-viewer{overflow-y:auto;padding:32px 40px}
+        .report-viewer h1,.report-viewer h2,.report-viewer h3{font-family:'Space Grotesk',sans-serif;margin:20px 0 10px;color:var(--text)}
+        .report-viewer h1{font-size:1.5rem;font-weight:700}
+        .report-viewer h2{font-size:1.2rem;font-weight:600}
+        .report-viewer h3{font-size:1rem;font-weight:600}
+        .report-viewer p{color:var(--text-dim);margin-bottom:14px;line-height:1.8}
+        .report-viewer ul,.report-viewer ol{color:var(--text-dim);margin:10px 0 16px 20px}
+        .report-viewer li{margin-bottom:6px;line-height:1.6}
+        .report-viewer code{font-family:'JetBrains Mono',monospace;background:var(--surface-2);padding:2px 6px;border-radius:4px;font-size:13px;color:var(--accent)}
+        .report-viewer pre{background:var(--surface-2);padding:16px;border-radius:8px;overflow-x:auto;margin-bottom:16px}
+        .report-viewer pre code{padding:0;background:none}
+        .report-viewer strong{color:var(--text)}
+        .report-viewer blockquote{border-left:3px solid var(--accent);padding:10px 16px;background:var(--accent-dim);border-radius:0 8px 8px 0;margin-bottom:16px}
+
+        .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 40px;text-align:center}
+        .empty-icon{font-size:48px;margin-bottom:16px;opacity:0.6}
+        .empty-title{font-family:'Space Grotesk',sans-serif;font-size:1.2rem;font-weight:600;margin-bottom:8px}
+        .empty-desc{color:var(--text-dim);font-size:14px;max-width:360px}
+
+        .skeleton{background:linear-gradient(90deg,var(--surface-2) 0%,var(--surface-3) 50%,var(--surface-2) 100%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:8px}
+        @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+        .toast-container{position:fixed;top:20px;right:20px;z-index:1000;display:flex;flex-direction:column;gap:8px}
+        .toast{padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;backdrop-filter:blur(12px);animation:slideIn 0.3s ease;border:1px solid var(--border)}
+        .toast.success{background:rgba(0,229,153,0.15);color:var(--accent)}
+        .toast.error{background:rgba(239,68,68,0.15);color:var(--red)}
+        @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+        .fade-up{opacity:0;transform:translateY(16px);animation:fadeUp 0.5s ease forwards}
+        @keyframes fadeUp{to{opacity:1;transform:translateY(0)}}
+        .delay-1{animation-delay:0.05s}
+
+        .mobile-toggle{display:none;position:fixed;top:16px;left:16px;z-index:100;width:40px;height:40px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);cursor:pointer;align-items:center;justify-content:center}
+        .hamburger-lines{display:flex;flex-direction:column;gap:4px}
+        .hamburger-lines span{display:block;width:18px;height:2px;background:var(--text);border-radius:2px}
+        .sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:40}
+        @media(max-width:768px){
+            .mobile-toggle{display:flex}.sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}.sidebar-backdrop.open{display:block}
+            .main{margin-left:0;padding:24px 16px 40px;padding-top:68px}
+            .reports-layout{grid-template-columns:1fr;height:auto}
+            .reports-list{border-right:none;border-bottom:1px solid var(--border);max-height:300px}
+        }
+    </style>
+</head>
+<body>
+    <button class="mobile-toggle" id="mobileToggle"><div class="hamburger-lines"><span></span><span></span><span></span></div></button>
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+    <div class="app">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header"><a href="/dashboard" class="logo"><div class="logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="#08090d" stroke-width="2.5" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>Runloop</a></div>
+            <nav class="sidebar-nav">
+                <div class="nav-section"><div class="nav-section-label">Main</div>
+                    <a href="/dashboard" class="nav-item"><span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>Overview</a>
+                    <a href="/chat" class="nav-item"><span class="icon">💬</span>Chat</a>
+                    <a href="/tasks" class="nav-item"><span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span>Tasks</a>
+                    <a href="/analytics" class="nav-item"><span class="icon">📊</span>Analytics</a>
+                </div>
+                <div class="nav-section"><div class="nav-section-label">Knowledge</div>
+                    <a href="/documents" class="nav-item"><span class="icon">📄</span>Documents</a><a href="/memory" class="nav-item"><span class="icon">🧠</span>Memory</a><a href="/skills" class="nav-item"><span class="icon">⚙️</span>Skills</a><a href="/learnings" class="nav-item"><span class="icon">💡</span>Learnings</a>
+                </div>
+                <div class="nav-section"><div class="nav-section-label">Automation</div>
+                    <a href="/workflows" class="nav-item"><span class="icon">🔄</span>Workflows</a><a href="/email" class="nav-item"><span class="icon">📧</span>Email</a><a href="/cycles" class="nav-item"><span class="icon">🌙</span>Cycles</a><a href="/reports" class="nav-item active"><span class="icon">📋</span>Reports</a>
+                </div>
+                <div class="nav-section"><div class="nav-section-label">Build</div>
+                    <a href="/agent-factory" class="nav-item"><span class="icon">🏭</span>Agent Factory</a><a href="/settings" class="nav-item"><span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></span>Settings</a>
+                </div>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-pill" onclick="document.getElementById('userDropdown').classList.toggle('open')">
+                    <div class="user-avatar" id="userAvatar">--</div>
+                    <div class="user-info"><div class="user-name" id="userName">Loading...</div><div class="user-email" id="userEmail">...</div></div>
+                    <div class="user-dropdown" id="userDropdown">
+                        <a href="/settings" class="user-dropdown-item">Settings</a>
+                        <button class="user-dropdown-item danger" onclick="event.preventDefault();event.stopPropagation();fetch('/api/auth/logout',{method:'POST'}).then(()=>window.location.href='/login')">Log out</button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+        <main class="main">
+            <div class="page-header fade-up">
+                <h1>Reports</h1>
+                <p>Browse reports generated by your agents</p>
+            </div>
+            <div class="reports-layout fade-up delay-1" id="reportsLayout">
+                <div class="reports-list">
+                    <div class="reports-list-header">
+                        <input type="text" placeholder="Search reports..." id="reportSearch" oninput="filterReports()">
+                    </div>
+                    <div id="reportsList"></div>
+                </div>
+                <div class="report-viewer" id="reportViewer">
+                    <div class="empty-state">
+                        <div class="empty-icon">📋</div>
+                        <div class="empty-title">Select a report</div>
+                        <div class="empty-desc">Choose a report from the list to view its contents</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <div class="toast-container" id="toastContainer"></div>
+<script>
+let allReports = [];
+
+async function loadUser() {
+    try {
+        const res = await fetch('/api/auth/me');
+        if (!res.ok) { window.location.href = '/login'; return; }
+        const { user } = await res.json();
+        document.getElementById('userName').textContent = user.name || 'User';
+        document.getElementById('userEmail').textContent = user.email;
+        document.getElementById('userAvatar').textContent = (user.name || 'U')[0].toUpperCase();
+    } catch { window.location.href = '/login'; }
+}
+
+async function loadReports() {
+    try {
+        const res = await fetch('/api/reports');
+        if (!res.ok) throw new Error('Failed');
+        const data = await res.json();
+        allReports = data.reports || data || [];
+        renderReportsList(allReports);
+    } catch (err) {
+        document.getElementById('reportsList').innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">No reports yet</div><div class="empty-desc">Reports will appear here as your agents complete work.</div></div>';
+    }
+}
+
+function renderReportsList(reports) {
+    const el = document.getElementById('reportsList');
+    if (!reports.length) {
+        el.innerHTML = '<div class="empty-state" style="padding:40px"><div class="empty-icon">📋</div><div class="empty-title">No reports yet</div><div class="empty-desc">Reports will appear here as your agents complete work.</div></div>';
+        return;
+    }
+    el.innerHTML = reports.map(r => `
+        <div class="report-item" data-id="${r.id}" onclick="viewReport(${r.id})">
+            <div class="report-item-title">${escapeHtml(r.title)}</div>
+            <div class="report-item-meta">
+                ${r.report_type ? `<span class="report-type-badge">${escapeHtml(r.report_type)}</span>` : ''}
+                <span>${r.created_at ? new Date(r.created_at).toLocaleDateString() : ''}</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function viewReport(id) {
+    document.querySelectorAll('.report-item').forEach(el => el.classList.remove('active'));
+    document.querySelector(`.report-item[data-id="${id}"]`)?.classList.add('active');
+
+    try {
+        const res = await fetch(`/api/reports/${id}`);
+        if (!res.ok) throw new Error('Failed');
+        const data = await res.json();
+        const report = data.report || data;
+        const viewer = document.getElementById('reportViewer');
+        if (typeof marked !== 'undefined') {
+            viewer.innerHTML = `<h1>${escapeHtml(report.title)}</h1><div style="margin-bottom:16px;font-size:12px;color:var(--text-muted)">${report.report_type ? `<span class="report-type-badge" style="margin-right:8px">${escapeHtml(report.report_type)}</span>` : ''}${report.created_at ? new Date(report.created_at).toLocaleString() : ''}</div><div>${marked.parse(report.content || '')}</div>`;
+        } else {
+            viewer.innerHTML = `<h1>${escapeHtml(report.title)}</h1><pre style="white-space:pre-wrap;color:var(--text-dim)">${escapeHtml(report.content || '')}</pre>`;
+        }
+    } catch {
+        document.getElementById('reportViewer').innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div><div class="empty-title">Error loading report</div></div>';
+    }
+}
+
+function filterReports() {
+    const q = document.getElementById('reportSearch').value.toLowerCase();
+    const filtered = q ? allReports.filter(r => (r.title + ' ' + (r.content || '')).toLowerCase().includes(q)) : allReports;
+    renderReportsList(filtered);
+}
+
+function escapeHtml(str) { return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+document.getElementById('mobileToggle')?.addEventListener('click', () => { document.getElementById('sidebar').classList.toggle('open'); document.getElementById('sidebarBackdrop').classList.toggle('open'); });
+document.getElementById('sidebarBackdrop')?.addEventListener('click', () => { document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebarBackdrop').classList.remove('open'); });
+
+(async () => { await Promise.all([loadUser(), loadReports()]); })();
+</script>
+<script src="/sidebar.js"></script>
+</body>
+</html>

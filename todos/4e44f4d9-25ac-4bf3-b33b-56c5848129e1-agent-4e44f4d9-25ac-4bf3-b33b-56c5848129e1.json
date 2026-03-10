@@ -1,0 +1,42 @@
+[
+  {
+    "content": "Create all 15+ documentation files in /docs/ with complete specs",
+    "status": "completed",
+    "activeForm": "Documentation verified complete"
+  },
+  {
+    "content": "Fix auth system: signup with slug generator, bcrypt, sessions",
+    "status": "completed",
+    "activeForm": "Auth system fixed"
+  },
+  {
+    "content": "Build CEO chat interface with real GPT-4o integration",
+    "status": "completed",
+    "activeForm": "Chat with GPT-4o complete"
+  },
+  {
+    "content": "Fix memory tool handlers to use layer1/2/3 tables",
+    "status": "completed",
+    "activeForm": "Memory handlers fixed"
+  },
+  {
+    "content": "Update all 8 agents with complete system prompts from docs",
+    "status": "completed",
+    "activeForm": "All 8 agents updated"
+  },
+  {
+    "content": "Commit and deploy all fixes to production",
+    "status": "in_progress",
+    "activeForm": "Deploying to production"
+  },
+  {
+    "content": "Test end-to-end: signup → login → chat → create task",
+    "status": "pending",
+    "activeForm": "Testing end-to-end"
+  },
+  {
+    "content": "Verify task execution works with real LLM + tools",
+    "status": "pending",
+    "activeForm": "Verifying task execution"
+  }
+]

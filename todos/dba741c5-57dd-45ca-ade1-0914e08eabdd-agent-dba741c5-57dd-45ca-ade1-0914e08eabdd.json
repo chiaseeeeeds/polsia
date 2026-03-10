@@ -1,0 +1,37 @@
+[
+  {
+    "content": "Phase 1: Fix DB CHECK constraint bugs on tasks table and all tables",
+    "status": "completed",
+    "activeForm": "Fixing DB CHECK constraint bugs"
+  },
+  {
+    "content": "Phase 2: Animated agent avatar + live status + chain of thought",
+    "status": "in_progress",
+    "activeForm": "Building animated agent avatar and live status"
+  },
+  {
+    "content": "Phase 3: Approval flows / human decision requests",
+    "status": "pending",
+    "activeForm": "Building approval flows"
+  },
+  {
+    "content": "Phase 4: Rich activity feed with specialized renderers",
+    "status": "pending",
+    "activeForm": "Building rich activity feed"
+  },
+  {
+    "content": "Phase 5: Monetization UX (credits, subscribe, upgrade modals)",
+    "status": "pending",
+    "activeForm": "Building monetization UX"
+  },
+  {
+    "content": "Phase 6: Onboarding / welcome experience",
+    "status": "pending",
+    "activeForm": "Building onboarding experience"
+  },
+  {
+    "content": "Phase 7: Missing UI sections (email, twitter, ads, etc)",
+    "status": "pending",
+    "activeForm": "Building missing UI sections"
+  }
+]

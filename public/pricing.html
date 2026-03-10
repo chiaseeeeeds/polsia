@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pricing — Runloop</title>
+    <meta name="description" content="Simple, transparent pricing. Start free, scale when you're ready. AI agents that handle engineering, marketing, sales, and ops.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{--bg:#08090d;--surface:#0f1117;--surface-2:#151821;--border:#1a1d27;--border-light:#252838;--text:#e8e9ed;--text-dim:#7a7f8e;--text-muted:#4a4f5e;--accent:#00e599;--accent-dim:rgba(0,229,153,0.12);--accent-glow:rgba(0,229,153,0.25);--warm:#ff6b4a;--purple:#8b5cf6;--blue:#6366f1;--amber:#f59e0b;--red:#ef4444;--cyan:#06b6d4}
+        body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
+        body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0}
+        .container{max-width:1100px;margin:0 auto;padding:0 24px;position:relative;z-index:1}
+        a{color:inherit;text-decoration:none}
+
+        /* NAV */
+        nav{padding:20px 0;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;background:rgba(8,9,13,0.85);backdrop-filter:blur(20px);border-bottom:1px solid transparent}
+        nav.scrolled{border-bottom-color:var(--border)}
+        .logo{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:22px;letter-spacing:-0.5px;display:flex;align-items:center;gap:10px}
+        .logo-mark{width:32px;height:32px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center}
+        .logo-mark svg{width:18px;height:18px}
+        .nav-links{display:flex;align-items:center;gap:32px}
+        .nav-links a{font-size:14px;color:var(--text-dim);transition:color 0.2s}
+        .nav-links a:hover{color:var(--text)}
+        .nav-links a.active{color:var(--accent)}
+        .nav-cta{display:flex;gap:12px;align-items:center}
+        .btn-ghost{padding:8px 16px;border-radius:8px;font-size:14px;font-weight:500;color:var(--text-dim);transition:all 0.2s}
+        .btn-ghost:hover{color:var(--text);background:var(--surface)}
+        .btn-primary{padding:8px 20px;border-radius:8px;font-size:14px;font-weight:600;background:var(--accent);color:#08090d;transition:all 0.2s;border:none;cursor:pointer;display:inline-block}
+        .btn-primary:hover{opacity:0.9;transform:translateY(-1px);box-shadow:0 4px 20px var(--accent-glow)}
+        .btn-primary-lg{padding:14px 32px;font-size:16px;border-radius:10px}
+        .btn-outline{padding:12px 28px;border-radius:10px;font-size:14px;font-weight:600;border:1px solid var(--border-light);background:transparent;color:var(--text);cursor:pointer;transition:all 0.2s;display:inline-block}
+        .btn-outline:hover{border-color:var(--accent);background:var(--accent-dim)}
+        .hamburger{display:none;flex-direction:column;gap:5px;cursor:pointer;padding:8px}
+        .hamburger span{width:22px;height:2px;background:var(--text);transition:all 0.3s}
+        .mobile-menu{display:none;position:fixed;top:73px;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--border);padding:24px;z-index:99;flex-direction:column;gap:16px}
+        .mobile-menu.open{display:flex}
+        .mobile-menu a{font-size:16px;padding:12px 0;color:var(--text-dim);border-bottom:1px solid var(--border)}
+
+        /* HERO */
+        .pricing-hero{padding:100px 0 64px;text-align:center;position:relative}
+        .pricing-hero::before{content:'';position:absolute;top:-100px;left:50%;transform:translateX(-50%);width:800px;height:800px;background:radial-gradient(circle,var(--accent-glow) 0%,transparent 70%);opacity:0.12;pointer-events:none}
+        .section-label{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:2px;color:var(--accent);margin-bottom:16px}
+        .pricing-hero h1{font-family:'Space Grotesk',sans-serif;font-size:clamp(2.2rem,5vw,3.5rem);font-weight:700;letter-spacing:-1.5px;line-height:1.1;margin-bottom:16px}
+        .pricing-hero p{font-size:clamp(1rem,2vw,1.2rem);color:var(--text-dim);max-width:500px;margin:0 auto}
+
+        /* TOGGLE */
+        .billing-toggle{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:40px;margin-bottom:8px}
+        .billing-toggle span{font-size:14px;color:var(--text-dim);font-weight:500}
+        .billing-toggle span.active{color:var(--text)}
+        .billing-toggle-switch{width:48px;height:26px;background:var(--surface-2);border:1px solid var(--border);border-radius:13px;position:relative;cursor:pointer;transition:all 0.3s}
+        .billing-toggle-switch::before{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;background:var(--accent);border-radius:50%;transition:all 0.3s}
+        .billing-toggle-switch.annual::before{transform:translateX(22px)}
+        .billing-save{font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:100px}
+
+        /* PRICING CARDS */
+        .pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding:48px 0 80px;max-width:1000px;margin:0 auto}
+        .price-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:40px 32px;position:relative;transition:all 0.3s}
+        .price-card:hover{transform:translateY(-4px);box-shadow:0 12px 40px rgba(0,0,0,0.3)}
+        .price-card.featured{border-color:var(--accent);box-shadow:0 0 60px var(--accent-dim)}
+        .price-card.featured::before{content:'Most Popular';position:absolute;top:-13px;left:50%;transform:translateX(-50%);padding:5px 18px;background:var(--accent);color:#08090d;font-size:12px;font-weight:700;border-radius:100px;white-space:nowrap}
+        .price-name{font-size:15px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:16px}
+        .price-amount{font-family:'Space Grotesk',sans-serif;font-size:3.5rem;font-weight:700;margin-bottom:4px;line-height:1.1}
+        .price-amount span{font-size:1rem;color:var(--text-dim);font-weight:400}
+        .price-period{font-size:13px;color:var(--text-muted);margin-bottom:24px}
+        .price-desc{color:var(--text-dim);font-size:0.95rem;margin-bottom:28px;line-height:1.6;min-height:48px}
+        .price-features{list-style:none;margin-bottom:32px}
+        .price-features li{padding:9px 0;font-size:14px;color:var(--text-dim);display:flex;align-items:flex-start;gap:12px;border-bottom:1px solid var(--border)}
+        .price-features li:last-child{border-bottom:none}
+        .price-features li .check{color:var(--accent);font-weight:700;font-size:14px;flex-shrink:0;margin-top:1px}
+        .price-btn{width:100%;padding:14px;border-radius:12px;font-size:15px;font-weight:600;text-align:center;display:block;transition:all 0.2s;cursor:pointer;border:none;font-family:'DM Sans',sans-serif}
+        .price-btn-primary{background:var(--accent);color:#08090d}
+        .price-btn-primary:hover{opacity:0.9;box-shadow:0 4px 20px var(--accent-glow)}
+        .price-btn-outline{background:transparent;border:1px solid var(--border-light);color:var(--text)}
+        .price-btn-outline:hover{border-color:var(--accent);background:var(--accent-dim)}
+
+        /* COMPARISON TABLE */
+        .comparison{padding:0 0 80px}
+        .comparison h2{font-family:'Space Grotesk',sans-serif;font-size:clamp(1.6rem,3vw,2.2rem);font-weight:700;letter-spacing:-0.5px;text-align:center;margin-bottom:40px}
+        .comparison-table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+        .comparison-table thead th{padding:16px 20px;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-dim);text-align:center;background:var(--surface-2);border-bottom:1px solid var(--border)}
+        .comparison-table thead th:first-child{text-align:left;padding-left:28px}
+        .comparison-table thead th.featured-col{color:var(--accent)}
+        .comparison-table tbody td{padding:16px 20px;font-size:14px;text-align:center;border-bottom:1px solid var(--border);color:var(--text-dim)}
+        .comparison-table tbody td:first-child{text-align:left;font-weight:500;color:var(--text);padding-left:28px}
+        .comparison-table tbody tr:last-child td{border-bottom:none}
+        .comparison-table tbody tr:hover td{background:var(--surface-2)}
+        .comparison-table .check-icon{color:var(--accent);font-weight:700}
+        .comparison-table .x-icon{color:var(--text-muted)}
+
+        /* FAQ */
+        .faq{padding:0 0 80px}
+        .faq h2{font-family:'Space Grotesk',sans-serif;font-size:clamp(1.6rem,3vw,2.2rem);font-weight:700;letter-spacing:-0.5px;text-align:center;margin-bottom:40px}
+        .faq-list{max-width:720px;margin:0 auto}
+        .faq-item{border:1px solid var(--border);border-radius:12px;margin-bottom:12px;overflow:hidden;background:var(--surface);transition:border-color 0.3s}
+        .faq-item:hover{border-color:var(--border-light)}
+        .faq-item.open{border-color:var(--border-light)}
+        .faq-question{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;cursor:pointer;font-weight:500;font-size:15px;transition:color 0.2s}
+        .faq-question:hover{color:var(--accent)}
+        .faq-item.open .faq-question{color:var(--accent)}
+        .faq-chevron{transition:transform 0.3s;flex-shrink:0;margin-left:16px}
+        .faq-item.open .faq-chevron{transform:rotate(180deg)}
+        .faq-answer{max-height:0;overflow:hidden;transition:max-height 0.4s ease,padding 0.3s ease}
+        .faq-item.open .faq-answer{max-height:300px}
+        .faq-answer-inner{padding:0 24px 20px;color:var(--text-dim);font-size:14px;line-height:1.7}
+
+        /* FOOTER */
+        footer{padding:48px 0;border-top:1px solid var(--border)}
+        .footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px}
+        .footer-brand p{color:var(--text-dim);font-size:0.9rem;margin-top:12px;max-width:280px}
+        .footer-col h4{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);margin-bottom:16px}
+        .footer-col a{display:block;font-size:14px;color:var(--text-muted);padding:4px 0;transition:color 0.2s}
+        .footer-col a:hover{color:var(--text)}
+        .footer-bottom{display:flex;justify-content:space-between;align-items:center;margin-top:40px;padding-top:24px;border-top:1px solid var(--border);color:var(--text-muted);font-size:13px}
+
+        /* ANIMATIONS */
+        @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+        .fade-up{animation:fadeUp 0.6s ease both}
+        .delay-1{animation-delay:0.1s}
+        .delay-2{animation-delay:0.2s}
+        .delay-3{animation-delay:0.3s}
+
+        /* RESPONSIVE */
+        @media(max-width:768px){
+            .nav-links{display:none}
+            .nav-cta{display:none}
+            .hamburger{display:flex}
+            .pricing-grid{grid-template-columns:1fr;max-width:400px}
+            .comparison-table{font-size:12px}
+            .comparison-table thead th,.comparison-table tbody td{padding:12px 10px}
+            .footer-grid{grid-template-columns:1fr 1fr}
+            .pricing-hero{padding:60px 0 40px}
+        }
+        @media(max-width:480px){
+            .footer-grid{grid-template-columns:1fr}
+            .footer-bottom{flex-direction:column;gap:8px;text-align:center}
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav id="nav">
+            <a href="/" class="logo">
+                <div class="logo-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#08090d" stroke-width="2.5" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                </div>
+                Runloop
+            </a>
+            <div class="nav-links">
+                <a href="/#agents">Features</a>
+                <a href="/pricing" class="active">Pricing</a>
+                <a href="/about">About</a>
+            </div>
+            <div class="nav-cta">
+                <a href="/login" class="btn-ghost">Log in</a>
+                <a href="/signup" class="btn-primary">Sign Up</a>
+            </div>
+            <div class="hamburger" onclick="document.querySelector('.mobile-menu').classList.toggle('open')">
+                <span></span><span></span><span></span>
+            </div>
+        </nav>
+    </div>
+    <div class="mobile-menu">
+        <a href="/#agents">Features</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/about">About</a>
+        <a href="/login">Log in</a>
+        <a href="/signup" class="btn-primary" style="text-align:center;margin-top:8px">Sign Up</a>
+    </div>
+
+    <!-- PRICING HERO -->
+    <section class="pricing-hero">
+        <div class="container">
+            <div class="section-label fade-up">Pricing</div>
+            <h1 class="fade-up delay-1">Simple, transparent pricing</h1>
+            <p class="fade-up delay-2">Start free, scale when ready. No hidden fees, no surprises.</p>
+        </div>
+    </section>
+
+    <!-- PRICING CARDS -->
+    <section>
+        <div class="container">
+            <div class="pricing-grid">
+                <!-- FREE -->
+                <div class="price-card fade-up">
+                    <div class="price-name">Free</div>
+                    <div class="price-amount">$0<span>/mo</span></div>
+                    <div class="price-period">Free forever</div>
+                    <div class="price-desc">Get started with core agents and see what autonomous operations look like.</div>
+                    <ul class="price-features">
+                        <li><span class="check">&#10003;</span> 3 agents</li>
+                        <li><span class="check">&#10003;</span> 50 tasks per month</li>
+                        <li><span class="check">&#10003;</span> Basic dashboard</li>
+                        <li><span class="check">&#10003;</span> Community support</li>
+                        <li><span class="check">&#10003;</span> 7-day log retention</li>
+                    </ul>
+                    <a href="/signup" class="price-btn price-btn-outline">Get Started Free</a>
+                </div>
+
+                <!-- PRO -->
+                <div class="price-card featured fade-up delay-1">
+                    <div class="price-name">Pro</div>
+                    <div class="price-amount">$49<span>/mo</span></div>
+                    <div class="price-period">Billed monthly</div>
+                    <div class="price-desc">Full autonomous operations for serious founders who want to ship faster.</div>
+                    <ul class="price-features">
+                        <li><span class="check">&#10003;</span> All 6 agents</li>
+                        <li><span class="check">&#10003;</span> Unlimited tasks</li>
+                        <li><span class="check">&#10003;</span> Priority execution</li>
+                        <li><span class="check">&#10003;</span> Full API access</li>
+                        <li><span class="check">&#10003;</span> Custom prompts</li>
+                        <li><span class="check">&#10003;</span> 90-day log retention</li>
+                        <li><span class="check">&#10003;</span> Email support</li>
+                    </ul>
+                    <a href="/signup?plan=pro" class="price-btn price-btn-primary">Start Pro Trial</a>
+                </div>
+
+                <!-- ENTERPRISE -->
+                <div class="price-card fade-up delay-2">
+                    <div class="price-name">Enterprise</div>
+                    <div class="price-amount">Custom</div>
+                    <div class="price-period">Tailored to your needs</div>
+                    <div class="price-desc">Dedicated infrastructure and custom agents for teams with complex requirements.</div>
+                    <ul class="price-features">
+                        <li><span class="check">&#10003;</span> Dedicated infrastructure</li>
+                        <li><span class="check">&#10003;</span> Custom agents</li>
+                        <li><span class="check">&#10003;</span> SLA guarantee</li>
+                        <li><span class="check">&#10003;</span> White-glove onboarding</li>
+                        <li><span class="check">&#10003;</span> SSO & audit logs</li>
+                        <li><span class="check">&#10003;</span> Dedicated support</li>
+                    </ul>
+                    <a href="mailto:hello@runloop.ai" class="price-btn price-btn-outline">Contact Sales</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- COMPARISON TABLE -->
+    <section class="comparison">
+        <div class="container">
+            <h2>Compare plans in detail</h2>
+            <div style="overflow-x:auto;border-radius:16px">
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>Feature</th>
+                            <th>Free</th>
+                            <th class="featured-col">Pro</th>
+                            <th>Enterprise</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Agents</td>
+                            <td>3</td>
+                            <td>All 6</td>
+                            <td>Unlimited + Custom</td>
+                        </tr>
+                        <tr>
+                            <td>Tasks / month</td>
+                            <td>50</td>
+                            <td>Unlimited</td>
+                            <td>Unlimited</td>
+                        </tr>
+                        <tr>
+                            <td>Dashboard</td>
+                            <td>Basic</td>
+                            <td>Full + Analytics</td>
+                            <td>Full + Analytics</td>
+                        </tr>
+                        <tr>
+                            <td>API Access</td>
+                            <td><span class="x-icon">&#10005;</span></td>
+                            <td><span class="check-icon">&#10003;</span></td>
+                            <td><span class="check-icon">&#10003;</span></td>
+                        </tr>
+                        <tr>
+                            <td>Custom Prompts</td>
+                            <td><span class="x-icon">&#10005;</span></td>
+                            <td><span class="check-icon">&#10003;</span></td>
+                            <td><span class="check-icon">&#10003;</span></td>
+                        </tr>
+                        <tr>
+                            <td>Log Retention</td>
+                            <td>7 days</td>
+                            <td>90 days</td>
+                            <td>Unlimited</td>
+                        </tr>
+                        <tr>
+                            <td>Support</td>
+                            <td>Community</td>
+                            <td>Email</td>
+                            <td>Dedicated</td>
+                        </tr>
+                        <tr>
+                            <td>SSO</td>
+                            <td><span class="x-icon">&#10005;</span></td>
+                            <td><span class="x-icon">&#10005;</span></td>
+                            <td><span class="check-icon">&#10003;</span></td>
+                        </tr>
+                        <tr>
+                            <td>SLA</td>
+                            <td><span class="x-icon">&#10005;</span></td>
+                            <td><span class="x-icon">&#10005;</span></td>
+                            <td><span class="check-icon">&#10003;</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="faq">
+        <div class="container">
+            <h2>Frequently asked questions</h2>
+            <div class="faq-list">
+                <div class="faq-item">
+                    <div class="faq-question" onclick="toggleFaq(this)">
+                        What happens when I hit the free tier limits?
+                        <svg class="faq-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+                    </div>
+                    <div class="faq-answer">
+                        <div class="faq-answer-inner">Your agents will pause once you've used your 50 monthly tasks. Your dashboard and data remain fully accessible. You can upgrade to Pro at any time to resume execution with unlimited tasks, or wait until the next billing cycle for your quota to reset.</div>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question" onclick="toggleFaq(this)">
+                        Can I cancel or downgrade at any time?
+                        <svg class="faq-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+                    </div>
+                    <div class="faq-answer">
+                        <div class="faq-answer-inner">Absolutely. You can downgrade from Pro to Free or cancel your subscription at any time from your Settings page. When you downgrade, you'll retain Pro access until the end of your current billing period. No contracts, no commitments.</div>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question" onclick="toggleFaq(this)">
+                        What does "priority execution" mean on Pro?
+                        <svg class="faq-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+                    </div>
+                    <div class="faq-answer">
+                        <div class="faq-answer-inner">Pro users get dedicated compute resources for their agents, meaning faster task execution and lower latency. Free tier users share a resource pool, which can occasionally mean slightly longer queue times during peak hours.</div>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question" onclick="toggleFaq(this)">
+                        How does the API work?
+                        <svg class="faq-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+                    </div>
+                    <div class="faq-answer">
+                        <div class="faq-answer-inner">The Runloop API lets you programmatically create tasks, trigger agents, and retrieve results. It's a RESTful API with JSON responses, authenticated via API keys you can generate in your Settings. Full documentation is available once you sign up for a Pro plan.</div>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question" onclick="toggleFaq(this)">
+                        Do you offer discounts for startups or nonprofits?
+                        <svg class="faq-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+                    </div>
+                    <div class="faq-answer">
+                        <div class="faq-answer-inner">Yes! We offer special pricing for early-stage startups and registered nonprofits. Reach out to us at hello@runloop.ai with details about your organization and we'll work something out. We believe everyone deserves access to autonomous operations.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer>
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-brand">
+                    <div class="logo">
+                        <div class="logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="#08090d" stroke-width="2.5" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+                        Runloop
+                    </div>
+                    <p>The autonomous operating system for business. AI agents that actually ship work.</p>
+                </div>
+                <div class="footer-col">
+                    <h4>Product</h4>
+                    <a href="/#agents">Agents</a>
+                    <a href="/pricing">Pricing</a>
+                    <a href="/dashboard">Dashboard</a>
+                    <a href="#">API Docs</a>
+                </div>
+                <div class="footer-col">
+                    <h4>Company</h4>
+                    <a href="/about">About</a>
+                    <a href="#">Blog</a>
+                    <a href="#">Careers</a>
+                </div>
+                <div class="footer-col">
+                    <h4>Support</h4>
+                    <a href="#">Documentation</a>
+                    <a href="#">Contact</a>
+                    <a href="#">Status</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <span>&copy; 2026 Runloop. All rights reserved.</span>
+                <span>Built with autonomous AI.</span>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+    // Nav scroll
+    window.addEventListener('scroll', () => {
+        document.getElementById('nav').classList.toggle('scrolled', window.scrollY > 20);
+    });
+
+    // FAQ accordion
+    function toggleFaq(el) {
+        const item = el.parentElement;
+        const wasOpen = item.classList.contains('open');
+        // Close all
+        document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+        // Toggle clicked
+        if (!wasOpen) item.classList.add('open');
+    }
+
+    // Polsia Analytics
+    (function() {
+        var slug = 'runloop';
+        if (!slug || slug === '__POLSIA_' + 'SLUG__') return;
+        var vid = localStorage.getItem('polsia_vid');
+        if (!vid) {
+            vid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                var r = Math.random() * 16 | 0;
+                return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+            });
+            localStorage.setItem('polsia_vid', vid);
+        }
+        new Image().src = 'https://polsia.com/api/beacon/pixel?s=' + encodeURIComponent(slug) + '&v=' + encodeURIComponent(vid);
+    })();
+    </script>
+</body>
+</html>

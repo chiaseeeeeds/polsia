@@ -1,0 +1,27 @@
+[
+  {
+    "content": "Phase 1: Fix agent creation bug",
+    "status": "completed",
+    "activeForm": "Investigating agent creation bug"
+  },
+  {
+    "content": "Phase 2: Build company switcher UI",
+    "status": "completed",
+    "activeForm": "Building company switcher UI"
+  },
+  {
+    "content": "Phase 3: Full audit & fix all broken pages",
+    "status": "in_progress",
+    "activeForm": "Auditing and fixing all pages"
+  },
+  {
+    "content": "Phase 4: Error handling sweep",
+    "status": "pending",
+    "activeForm": "Adding error handling everywhere"
+  },
+  {
+    "content": "Phase 5: Deploy & verify",
+    "status": "pending",
+    "activeForm": "Deploying and verifying everything"
+  }
+]

@@ -1,0 +1,57 @@
+[
+  {
+    "content": "Phase 0: Create all documentation files (15 total)",
+    "status": "completed",
+    "activeForm": "Documentation complete"
+  },
+  {
+    "content": "Phase 1: Build complete database schema (all tables)",
+    "status": "in_progress",
+    "activeForm": "Building database schema"
+  },
+  {
+    "content": "Phase 2: Implement auth system (signup/login/sessions)",
+    "status": "pending",
+    "activeForm": "Implementing authentication"
+  },
+  {
+    "content": "Phase 3: Build CEO Chat interface (the product)",
+    "status": "pending",
+    "activeForm": "Building CEO chat interface"
+  },
+  {
+    "content": "Phase 4: Seed all 8 agents with exact prompts",
+    "status": "pending",
+    "activeForm": "Seeding production agents"
+  },
+  {
+    "content": "Phase 5: Build task queue worker with routing",
+    "status": "pending",
+    "activeForm": "Building task execution system"
+  },
+  {
+    "content": "Phase 6-7: Memory system + Documents",
+    "status": "pending",
+    "activeForm": "Implementing memory and documents"
+  },
+  {
+    "content": "Phase 8-9: Tool registry + Onboarding wizard",
+    "status": "pending",
+    "activeForm": "Building tools and onboarding"
+  },
+  {
+    "content": "Phase 10-11: Cycle engine + Recurring tasks",
+    "status": "pending",
+    "activeForm": "Implementing autonomous systems"
+  },
+  {
+    "content": "Phase 12-14: Dashboard, Agent Factory, Skills",
+    "status": "pending",
+    "activeForm": "Building management interfaces"
+  },
+  {
+    "content": "Phase 15-16: Email/Workflows/Settings + Premium UI",
+    "status": "pending",
+    "activeForm": "Polishing to $10M quality"
+  }
+]

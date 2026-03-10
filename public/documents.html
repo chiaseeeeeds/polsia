@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documents — Runloop</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ── Reset & Tokens ────────────────────────────── */
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root {
+            --bg:#08090d;
+            --surface:#0f1117;
+            --surface-2:#151821;
+            --surface-3:#1a1e2a;
+            --border:#1a1d27;
+            --border-light:#252838;
+            --text:#e8e9ed;
+            --text-dim:#7a7f8e;
+            --text-muted:#4a4f5e;
+            --accent:#00e599;
+            --accent-dim:rgba(0,229,153,0.12);
+            --accent-glow:rgba(0,229,153,0.25);
+            --purple:#8b5cf6;
+            --blue:#6366f1;
+            --amber:#f59e0b;
+            --red:#ef4444;
+            --cyan:#06b6d4;
+            --sidebar-w:260px;
+        }
+        body {
+            font-family:'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+            background:var(--bg);
+            color:var(--text);
+            line-height:1.6;
+            overflow-x:hidden;
+        }
+        /* noise overlay */
+        body::before {
+            content:'';position:fixed;top:0;left:0;right:0;bottom:0;
+            background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+            pointer-events:none;z-index:0;
+        }
+        a{color:inherit;text-decoration:none}
+        input,select,textarea,button{font-family:inherit}
+
+        /* ── App Shell ────────────────────────────── */
+        .app{display:flex;min-height:100vh;position:relative;z-index:1}
+
+        /* ── Sidebar ────────────────────────────── */
+        .sidebar {
+            width:var(--sidebar-w);
+            background:var(--surface);
+            border-right:1px solid var(--border);
+            padding:0;
+            display:flex;
+            flex-direction:column;
+            position:fixed;
+            top:0;bottom:0;left:0;
+            z-index:50;
+            transition:transform 0.3s cubic-bezier(.4,0,.2,1);
+        }
+        .sidebar-header {
+            padding:20px 20px 18px;
+            border-bottom:1px solid var(--border);
+        }
+        .logo {
+            font-family:'Space Grotesk',sans-serif;
+            font-weight:700;font-size:20px;letter-spacing:-0.5px;
+            display:flex;align-items:center;gap:10px;
+        }
+        .logo-mark {
+            width:30px;height:30px;border-radius:8px;
+            background:var(--accent);
+            display:flex;align-items:center;justify-content:center;flex-shrink:0;
+        }
+        .logo-mark svg{width:16px;height:16px}
+        .sidebar-nav{flex:1;padding:12px 12px 0;overflow-y:auto}
+        .nav-section{margin-bottom:16px}
+        .nav-section-label {
+            font-size:10px;font-weight:600;
+            text-transform:uppercase;letter-spacing:1.8px;
+            color:var(--text-muted);
+            padding:8px 12px 6px;
+        }
+        .nav-item {
+            display:flex;align-items:center;gap:10px;
+            padding:10px 12px;border-radius:8px;
+            font-size:14px;font-weight:500;color:var(--text-dim);
+            transition:all 0.15s;cursor:pointer;
+        }
+        .nav-item:hover{color:var(--text);background:var(--surface-2)}
+        .nav-item.active{color:var(--accent);background:var(--accent-dim)}
+        .nav-item .icon{width:20px;text-align:center;font-size:15px;flex-shrink:0}
+
+        /* sidebar footer / user pill */
+        .sidebar-footer{padding:12px 16px;border-top:1px solid var(--border)}
+        .user-pill {
+            display:flex;align-items:center;gap:10px;
+            padding:8px 10px;border-radius:10px;
+            transition:background 0.15s;cursor:pointer;
+            position:relative;
+        }
+        .user-pill:hover{background:var(--surface-2)}
+        .user-avatar {
+            width:34px;height:34px;border-radius:8px;
+            background:var(--accent-dim);
+            display:flex;align-items:center;justify-content:center;
+            font-size:14px;font-weight:700;color:var(--accent);flex-shrink:0;
+        }
+        .user-info{flex:1;min-width:0}
+        .user-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .user-email{font-size:11px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .user-menu-toggle{color:var(--text-muted);font-size:16px;flex-shrink:0;transition:transform 0.2s}
+        .user-pill.open .user-menu-toggle{transform:rotate(180deg)}
+
+        /* user dropdown */
+        .user-dropdown {
+            position:absolute;bottom:calc(100% + 8px);left:0;right:0;
+            background:var(--surface-2);
+            border:1px solid var(--border-light);
+            border-radius:10px;
+            padding:6px;
+            display:none;
+            box-shadow:0 -8px 32px rgba(0,0,0,0.4);
+            z-index:60;
+        }
+        .user-dropdown.open{display:block}
+        .user-dropdown-item {
+            display:flex;align-items:center;gap:8px;
+            padding:9px 12px;border-radius:6px;
+            font-size:13px;color:var(--text-dim);
+            cursor:pointer;transition:all 0.12s;border:none;
+            background:none;width:100%;text-align:left;
+        }
+        .user-dropdown-item:hover{background:var(--surface-3);color:var(--text)}
+        .user-dropdown-item.danger{color:var(--red)}
+        .user-dropdown-item.danger:hover{background:rgba(239,68,68,0.08)}
+
+        /* ── Main Content ────────────────────────────── */
+        .main{flex:1;margin-left:var(--sidebar-w);padding:32px 40px 48px;min-height:100vh}
+
+        /* ── Page Header ────────────────────────────── */
+        .page-header{margin-bottom:36px}
+        .page-header h1 {
+            font-family:'Space Grotesk',sans-serif;
+            font-size:1.85rem;font-weight:700;letter-spacing:-0.5px;
+            margin-bottom:4px;
+        }
+        .page-header p{color:var(--text-dim);font-size:0.95rem}
+
+        /* ── Document Grid ────────────────────────────── */
+        .doc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;margin-bottom:36px}
+        .doc-card {
+            background:var(--surface);
+            border:1px solid var(--border);
+            border-radius:16px;
+            padding:24px;
+            transition:all 0.3s cubic-bezier(.4,0,.2,1);
+            cursor:default;
+            position:relative;
+            overflow:hidden;
+            backdrop-filter:blur(12px);
+            background:linear-gradient(135deg, rgba(15,17,23,0.85) 0%, rgba(21,24,33,0.75) 100%);
+        }
+        .doc-card::before {
+            content:'';
+            position:absolute;inset:0;
+            border-radius:16px;
+            padding:1px;
+            background:linear-gradient(135deg, rgba(255,255,255,0.06) 0%, transparent 50%);
+            -webkit-mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite:xor;
+            mask-composite:exclude;
+            pointer-events:none;
+        }
+        .doc-card:hover {
+            border-color:var(--border-light);
+            transform:translateY(-3px);
+            box-shadow:0 10px 36px rgba(0,0,0,0.25);
+        }
+        .doc-card .top-accent {
+            position:absolute;top:0;left:0;right:0;height:3px;
+            border-radius:16px 16px 0 0;
+        }
+        .doc-card-head {
+            display:flex;align-items:flex-start;justify-content:space-between;
+            margin-bottom:14px;
+        }
+        .doc-card-left{display:flex;align-items:center;gap:12px}
+        .doc-icon-wrap {
+            width:44px;height:44px;border-radius:12px;
+            display:flex;align-items:center;justify-content:center;
+            font-size:22px;flex-shrink:0;
+        }
+        .doc-card h3 {
+            font-family:'Space Grotesk',sans-serif;
+            font-size:0.95rem;font-weight:600;
+        }
+        .doc-card-type {
+            font-size:11px;color:var(--text-muted);
+            font-family:'JetBrains Mono',monospace;
+            margin-top:2px;
+        }
+        .doc-preview {
+            color:var(--text-dim);font-size:13px;line-height:1.55;
+            margin-bottom:16px;min-height:60px;
+            display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+        }
+        .doc-card-footer {
+            display:flex;align-items:center;justify-content:space-between;
+        }
+        .doc-meta {
+            font-family:'JetBrains Mono',monospace;
+            font-size:11px;color:var(--text-muted);
+            display:flex;align-items:center;gap:4px;
+        }
+        .doc-meta svg{flex-shrink:0}
+
+        /* Empty card state */
+        .doc-card.empty .doc-preview {
+            color:var(--text-muted);
+            font-style:italic;
+        }
+        .doc-card.empty {
+            border-style:dashed;
+            opacity:0.75;
+        }
+        .doc-card.empty:hover{opacity:1}
+
+        /* ── Buttons ────────────────────────────── */
+        .btn{
+            display:inline-flex;align-items:center;justify-content:center;gap:6px;
+            border:none;border-radius:8px;
+            font-size:13px;font-weight:600;
+            cursor:pointer;transition:all 0.2s;
+            font-family:'DM Sans',sans-serif;
+        }
+        .btn-edit {
+            padding:7px 14px;
+            background:var(--accent-dim);color:var(--accent);
+        }
+        .btn-edit:hover{background:rgba(0,229,153,0.2);transform:translateY(-1px)}
+        .btn-create {
+            padding:7px 14px;
+            background:var(--surface-2);color:var(--text-dim);
+            border:1px solid var(--border);
+        }
+        .btn-create:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+        .btn-primary {
+            padding:10px 22px;
+            background:var(--accent);color:#08090d;
+        }
+        .btn-primary:hover{opacity:0.9;box-shadow:0 4px 16px var(--accent-glow)}
+        .btn-primary:disabled{opacity:0.5;cursor:not-allowed;transform:none;box-shadow:none}
+        .btn-secondary {
+            padding:10px 22px;
+            background:var(--surface-2);color:var(--text);
+            border:1px solid var(--border);
+        }
+        .btn-secondary:hover{border-color:var(--border-light)}
+        .btn-icon {
+            padding:8px;
+            background:var(--surface-2);color:var(--text-dim);
+            border:1px solid var(--border);
+            border-radius:8px;
+        }
+        .btn-icon:hover{border-color:var(--border-light);color:var(--text)}
+
+        /* ── Editor Overlay ────────────────────────────── */
+        .editor-overlay {
+            position:fixed;inset:0;
+            background:var(--bg);
+            z-index:200;
+            display:none;
+            flex-direction:column;
+            opacity:0;
+            transition:opacity 0.3s cubic-bezier(.4,0,.2,1);
+        }
+        .editor-overlay.open{display:flex}
+        .editor-overlay.visible{opacity:1}
+
+        .editor-topbar {
+            display:flex;align-items:center;justify-content:space-between;
+            padding:14px 24px;
+            border-bottom:1px solid var(--border);
+            background:var(--surface);
+            flex-shrink:0;
+        }
+        .editor-topbar-left{display:flex;align-items:center;gap:14px}
+        .editor-topbar-icon {
+            width:36px;height:36px;border-radius:10px;
+            display:flex;align-items:center;justify-content:center;
+            font-size:18px;
+        }
+        .editor-topbar h2 {
+            font-family:'Space Grotesk',sans-serif;
+            font-size:1.1rem;font-weight:600;letter-spacing:-0.3px;
+        }
+        .editor-topbar-sub{font-size:12px;color:var(--text-dim);margin-top:1px}
+        .editor-topbar-right{display:flex;align-items:center;gap:10px}
+        .editor-status {
+            font-size:12px;color:var(--text-muted);
+            font-family:'JetBrains Mono',monospace;
+            display:flex;align-items:center;gap:6px;
+        }
+        .editor-status .dot {
+            width:6px;height:6px;border-radius:50%;
+            background:var(--text-muted);
+            transition:background 0.3s;
+        }
+        .editor-status.unsaved .dot{background:var(--amber)}
+        .editor-status.saving .dot{background:var(--blue);animation:pulse-status 1s ease-in-out infinite}
+        .editor-status.saved .dot{background:var(--accent)}
+
+        .editor-body {
+            flex:1;display:grid;
+            grid-template-columns:1fr 1fr;
+            min-height:0;
+            overflow:hidden;
+        }
+
+        .editor-pane {
+            display:flex;flex-direction:column;
+            min-height:0;overflow:hidden;
+        }
+        .editor-pane-header {
+            display:flex;align-items:center;justify-content:space-between;
+            padding:10px 20px;
+            border-bottom:1px solid var(--border);
+            background:var(--surface);
+            flex-shrink:0;
+        }
+        .editor-pane-label {
+            font-size:11px;font-weight:600;
+            text-transform:uppercase;letter-spacing:1.5px;
+            color:var(--text-muted);
+        }
+
+        .editor-textarea {
+            flex:1;
+            width:100%;
+            padding:24px;
+            background:var(--bg);
+            border:none;
+            color:var(--text);
+            font-family:'JetBrains Mono',monospace;
+            font-size:14px;
+            line-height:1.7;
+            resize:none;
+            outline:none;
+            overflow-y:auto;
+            tab-size:4;
+        }
+        .editor-textarea::placeholder{color:var(--text-muted)}
+
+        .editor-preview {
+            flex:1;
+            padding:24px;
+            overflow-y:auto;
+            background:var(--surface);
+            border-left:1px solid var(--border);
+        }
+
+        /* ── Markdown Preview Styles ────────────────────────────── */
+        .md-preview h1 {
+            font-family:'Space Grotesk',sans-serif;
+            font-size:1.8rem;font-weight:700;letter-spacing:-0.5px;
+            margin-bottom:16px;padding-bottom:12px;
+            border-bottom:1px solid var(--border);
+        }
+        .md-preview h2 {
+            font-family:'Space Grotesk',sans-serif;
+            font-size:1.35rem;font-weight:600;letter-spacing:-0.3px;
+            margin-top:28px;margin-bottom:12px;
+        }
+        .md-preview h3 {
+            font-family:'Space Grotesk',sans-serif;
+            font-size:1.1rem;font-weight:600;
+            margin-top:20px;margin-bottom:8px;
+        }
+        .md-preview p {
+            color:var(--text-dim);font-size:14px;line-height:1.7;
+            margin-bottom:12px;
+        }
+        .md-preview strong{color:var(--text);font-weight:600}
+        .md-preview em{font-style:italic;color:var(--text-dim)}
+        .md-preview ul,.md-preview ol {
+            color:var(--text-dim);font-size:14px;line-height:1.7;
+            margin-bottom:12px;padding-left:24px;
+        }
+        .md-preview li{margin-bottom:4px}
+        .md-preview pre {
+            background:var(--surface-2);
+            border:1px solid var(--border);
+            border-radius:8px;
+            padding:16px;
+            margin-bottom:12px;
+            overflow-x:auto;
+        }
+        .md-preview pre code {
+            font-family:'JetBrains Mono',monospace;
+            font-size:13px;
+            color:var(--accent);
+            background:none;
+            padding:0;
+            border-radius:0;
+        }
+        .md-preview code {
+            font-family:'JetBrains Mono',monospace;
+            font-size:13px;
+            background:var(--surface-2);
+            color:var(--cyan);
+            padding:2px 6px;
+            border-radius:4px;
+        }
+        .md-preview blockquote {
+            border-left:3px solid var(--accent);
+            padding:8px 16px;
+            margin-bottom:12px;
+            background:var(--accent-dim);
+            border-radius:0 8px 8px 0;
+        }
+        .md-preview blockquote p{color:var(--text);margin-bottom:0}
+        .md-preview hr{border:none;border-top:1px solid var(--border);margin:24px 0}
+        .md-preview-empty {
+            display:flex;flex-direction:column;align-items:center;justify-content:center;
+            height:100%;color:var(--text-muted);text-align:center;padding:40px;
+        }
+        .md-preview-empty .icon{font-size:48px;margin-bottom:12px;opacity:0.4}
+        .md-preview-empty p{font-size:14px}
+
+        /* ── Toast Notification System ────────────────────────────── */
+        .toast-container {
+            position:fixed;top:24px;right:24px;z-index:2000;
+            display:flex;flex-direction:column;gap:10px;
+            pointer-events:none;
+        }
+        .toast {
+            pointer-events:auto;
+            background:var(--surface);
+            border:1px solid var(--border);
+            border-radius:12px;
+            padding:14px 20px;
+            font-size:14px;font-weight:500;
+            display:flex;align-items:center;gap:10px;
+            box-shadow:0 12px 40px rgba(0,0,0,0.35);
+            transform:translateX(120%);
+            opacity:0;
+            transition:all 0.4s cubic-bezier(.4,0,.2,1);
+            max-width:380px;
+        }
+        .toast.visible{transform:translateX(0);opacity:1}
+        .toast.success{border-left:3px solid var(--accent)}
+        .toast.success .toast-icon{color:var(--accent)}
+        .toast.error{border-left:3px solid var(--red)}
+        .toast.error .toast-icon{color:var(--red)}
+        .toast.info{border-left:3px solid var(--blue)}
+        .toast.info .toast-icon{color:var(--blue)}
+        .toast-icon{font-size:18px;flex-shrink:0}
+        .toast-message{flex:1;color:var(--text)}
+        .toast-close {
+            background:none;border:none;color:var(--text-muted);
+            cursor:pointer;font-size:16px;padding:2px;
+            transition:color 0.15s;flex-shrink:0;
+        }
+        .toast-close:hover{color:var(--text)}
+
+        /* ── Mobile Hamburger ────────────────────────────── */
+        .mobile-toggle {
+            display:none;
+            position:fixed;top:16px;left:16px;z-index:60;
+            width:42px;height:42px;
+            background:var(--surface);
+            border:1px solid var(--border);
+            border-radius:10px;
+            align-items:center;justify-content:center;
+            cursor:pointer;
+            transition:all 0.2s;
+        }
+        .mobile-toggle:hover{background:var(--surface-2)}
+        .hamburger-lines{display:flex;flex-direction:column;gap:4px}
+        .hamburger-lines span {
+            display:block;width:18px;height:2px;
+            background:var(--text);border-radius:2px;
+            transition:all 0.3s;
+        }
+        .mobile-toggle.active .hamburger-lines span:nth-child(1){transform:rotate(45deg) translateY(4.2px) translateX(4.2px)}
+        .mobile-toggle.active .hamburger-lines span:nth-child(2){opacity:0;transform:translateX(-8px)}
+        .mobile-toggle.active .hamburger-lines span:nth-child(3){transform:rotate(-45deg) translateY(-4.2px) translateX(4.2px)}
+
+        /* sidebar backdrop on mobile */
+        .sidebar-backdrop {
+            display:none;position:fixed;inset:0;
+            background:rgba(0,0,0,0.5);z-index:40;
+            opacity:0;transition:opacity 0.3s;
+        }
+        .sidebar-backdrop.visible{display:block;opacity:1}
+
+        /* ── Loading Skeleton ────────────────────────────── */
+        .skeleton {
+            background:linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%);
+            background-size:200% 100%;
+            animation:shimmer 1.5s ease-in-out infinite;
+            border-radius:8px;
+        }
+        @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+        .skeleton-card{height:200px;border-radius:16px}
+
+        /* ── Scrollbar ────────────────────────────── */
+        ::-webkit-scrollbar{width:6px}
+        ::-webkit-scrollbar-track{background:transparent}
+        ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+        ::-webkit-scrollbar-thumb:hover{background:var(--border-light)}
+
+        /* ── Animations ────────────────────────────── */
+        @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes pulse-status{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.35;transform:scale(0.8)}}
+        @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+        .fade-up{animation:fadeUp 0.5s ease both}
+        .delay-1{animation-delay:0.05s}
+        .delay-2{animation-delay:0.1s}
+        .delay-3{animation-delay:0.15s}
+        .delay-4{animation-delay:0.2s}
+        .delay-5{animation-delay:0.25s}
+
+        /* ── Responsive ────────────────────────────── */
+        @media (max-width:1024px) {
+            .doc-grid{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+            .editor-body{grid-template-columns:1fr}
+            .editor-preview{border-left:none;border-top:1px solid var(--border)}
+        }
+        @media (max-width:768px) {
+            .sidebar{transform:translateX(-100%)}
+            .sidebar.open{transform:translateX(0)}
+            .main{margin-left:0;padding:24px 16px 40px;padding-top:72px}
+            .mobile-toggle{display:flex}
+            .doc-grid{grid-template-columns:1fr}
+            .toast-container{top:12px;right:12px;left:12px}
+            .toast{max-width:100%}
+            .editor-topbar{padding:12px 16px}
+            .editor-textarea{padding:16px}
+            .editor-preview{padding:16px}
+        }
+        @media (max-width:480px) {
+            .page-header h1{font-size:1.5rem}
+        }
+    </style>
+</head>
+<body>
+    <!-- Mobile hamburger toggle -->
+    <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle navigation">
+        <div class="hamburger-lines"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Sidebar backdrop (mobile) -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+    <div class="app">
+        <!-- ─── Sidebar ──────────────────────────── -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <a href="/dashboard" class="logo">
+                    <div class="logo-mark">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="#08090d" stroke-width="2.5" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                    </div>
+                    Runloop
+                </a>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-label">Main</div>
+                    <a href="/dashboard" class="nav-item"><span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>Overview</a>
+                    <a href="/chat" class="nav-item"><span class="icon">💬</span>Chat</a>
+                    <a href="/tasks" class="nav-item"><span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span>Tasks</a>
+                    <a href="/analytics" class="nav-item"><span class="icon">📊</span>Analytics</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-label">Knowledge</div>
+                    <a href="/documents" class="nav-item active"><span class="icon">📄</span>Documents</a>
+                    <a href="/memory" class="nav-item"><span class="icon">🧠</span>Memory</a>
+                    <a href="/skills" class="nav-item"><span class="icon">⚙️</span>Skills</a>
+                    <a href="/learnings" class="nav-item"><span class="icon">💡</span>Learnings</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-label">Automation</div>
+                    <a href="/workflows" class="nav-item"><span class="icon">🔄</span>Workflows</a>
+                    <a href="/email" class="nav-item"><span class="icon">📧</span>Email</a>
+                    <a href="/cycles" class="nav-item"><span class="icon">🌙</span>Cycles</a>
+                    <a href="/reports" class="nav-item"><span class="icon">📋</span>Reports</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-label">Build</div>
+                    <a href="/agent-factory" class="nav-item"><span class="icon">🏭</span>Agent Factory</a>
+                    <a href="/settings" class="nav-item"><span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></span>Settings</a>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-pill" id="userPill" onclick="toggleUserMenu()">
+                    <div class="user-avatar" id="userAvatar">--</div>
+                    <div class="user-info">
+                        <div class="user-name" id="userName">Loading...</div>
+                        <div class="user-email" id="userEmail">...</div>
+                    </div>
+                    <span class="user-menu-toggle">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 15l-6-6-6 6"/></svg>
+                    </span>
+
+                    <div class="user-dropdown" id="userDropdown">
+                        <a href="/settings" class="user-dropdown-item">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9"/></svg>
+                            Settings
+                        </a>
+                        <button class="user-dropdown-item danger" onclick="handleLogout(event)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                            Log out
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ─── Main Content ──────────────────────────── -->
+        <main class="main" id="mainContent">
+            <!-- Page Header -->
+            <div class="page-header fade-up">
+                <h1>Documents</h1>
+                <p>Foundational company documents that guide all agents</p>
+            </div>
+
+            <!-- Document Grid -->
+            <div class="doc-grid" id="docGrid">
+                <!-- skeleton cards while loading -->
+                <div class="skeleton skeleton-card"></div>
+                <div class="skeleton skeleton-card"></div>
+                <div class="skeleton skeleton-card"></div>
+                <div class="skeleton skeleton-card"></div>
+                <div class="skeleton skeleton-card"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ─── Editor Overlay ──────────────────────────── -->
+    <div class="editor-overlay" id="editorOverlay">
+        <div class="editor-topbar">
+            <div class="editor-topbar-left">
+                <button class="btn btn-icon" onclick="closeEditor()" title="Back to documents">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5"/><polyline points="12 19 5 12 12 5"/></svg>
+                </button>
+                <div class="editor-topbar-icon" id="editorIcon"></div>
+                <div>
+                    <h2 id="editorTitle">Document</h2>
+                    <div class="editor-topbar-sub" id="editorSubtitle">Editing document</div>
+                </div>
+            </div>
+            <div class="editor-topbar-right">
+                <div class="editor-status" id="editorStatus">
+                    <span class="dot"></span>
+                    <span class="label">Ready</span>
+                </div>
+                <button class="btn btn-primary" id="saveBtn" onclick="saveDocument()" disabled>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                    Save
+                </button>
+            </div>
+        </div>
+        <div class="editor-body">
+            <div class="editor-pane">
+                <div class="editor-pane-header">
+                    <span class="editor-pane-label">Markdown</span>
+                    <span style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace" id="charCount">0 chars</span>
+                </div>
+                <textarea class="editor-textarea" id="editorTextarea" placeholder="Write your document in markdown...
+
+# Example Heading
+
+Your content here. Use **bold**, *italic*, and more.
+
+- List item one
+- List item two
+
+> A blockquote for emphasis
+
+```
+code blocks work too
+```"></textarea>
+            </div>
+            <div class="editor-pane">
+                <div class="editor-pane-header">
+                    <span class="editor-pane-label">Preview</span>
+                </div>
+                <div class="editor-preview" id="editorPreview">
+                    <div class="md-preview-empty">
+                        <div class="icon">&#x1F4DD;</div>
+                        <p>Start typing to see the preview</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Toast Container ──────────────────────────── -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+    /* ══════════════════════════════════════════════
+       State
+       ══════════════════════════════════════════════ */
+    let currentUser = null;
+    let documents = {};
+    let currentDocType = null;
+    let originalContent = '';
+    let editorDirty = false;
+
+    const DOC_TYPES = {
+        mission: {
+            title: 'Mission',
+            icon: '\u{1F3AF}',
+            color: '#00e599',
+            description: 'Your company mission, vision, and core values',
+            placeholder: '# Our Mission\n\nDescribe your company\'s mission statement, vision for the future, and the core values that drive your team.\n\n## Vision\n\n## Core Values\n\n- \n- \n- '
+        },
+        product_overview: {
+            title: 'Product Overview',
+            icon: '\u{1F4E6}',
+            color: '#6366f1',
+            description: 'What you build, who it\'s for, and key features',
+            placeholder: '# Product Overview\n\nDescribe your product, target audience, and key features.\n\n## What We Build\n\n## Target Audience\n\n## Key Features\n\n- \n- \n- '
+        },
+        tech_notes: {
+            title: 'Tech Notes',
+            icon: '\u{1F527}',
+            color: '#8b5cf6',
+            description: 'Technical architecture, stack, and conventions',
+            placeholder: '# Tech Notes\n\nDocument your technical architecture, technology stack, and coding conventions.\n\n## Architecture\n\n## Tech Stack\n\n## Conventions\n\n```\n// Code conventions here\n```'
+        },
+        brand_voice: {
+            title: 'Brand Voice',
+            icon: '\u{1F3A8}',
+            color: '#f59e0b',
+            description: 'Tone, style, and communication guidelines',
+            placeholder: '# Brand Voice\n\nDefine your brand\'s tone, style, and communication guidelines.\n\n## Tone\n\n## Style Guidelines\n\n## Do\'s and Don\'ts\n\n**Do:**\n- \n\n**Don\'t:**\n- '
+        },
+        user_research: {
+            title: 'User Research',
+            icon: '\u{1F465}',
+            color: '#06b6d4',
+            description: 'User personas, pain points, and insights',
+            placeholder: '# User Research\n\nCapture user personas, pain points, and key insights from research.\n\n## Personas\n\n### Persona 1\n\n## Pain Points\n\n- \n\n## Key Insights\n\n> '
+        }
+    };
+
+    /* ══════════════════════════════════════════════
+       Helpers
+       ══════════════════════════════════════════════ */
+    async function apiFetch(url, opts = {}) {
+        const res = await fetch(url, {
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', ...opts.headers },
+            ...opts
+        });
+        if (res.status === 401) {
+            window.location.href = '/login';
+            throw new Error('Unauthorized');
+        }
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Request failed');
+        return data;
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    function getInitials(name) {
+        if (!name) return '?';
+        return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    }
+
+    function timeAgo(dateStr) {
+        if (!dateStr) return 'never';
+        const now = new Date();
+        const date = new Date(dateStr);
+        const diffMs = now - date;
+        const diffS = Math.floor(diffMs / 1000);
+        const diffM = Math.floor(diffS / 60);
+        const diffH = Math.floor(diffM / 60);
+        const diffD = Math.floor(diffH / 24);
+
+        if (diffS < 10) return 'just now';
+        if (diffS < 60) return diffS + 's ago';
+        if (diffM < 60) return diffM + 'm ago';
+        if (diffH < 24) return diffH + 'h ago';
+        if (diffD < 7) return diffD + 'd ago';
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+
+    function colorToBgDim(hex) {
+        return hex + '18';
+    }
+
+    /* ══════════════════════════════════════════════
+       Simple Markdown Renderer
+       ══════════════════════════════════════════════ */
+    function renderMarkdown(md) {
+        if (!md || !md.trim()) return '';
+
+        let html = escapeHtml(md);
+
+        // Code blocks (``` ... ```) — must be processed first
+        html = html.replace(/```(?:\w*)\n([\s\S]*?)```/g, function(match, code) {
+            return '<pre><code>' + code.trim() + '</code></pre>';
+        });
+
+        // Inline code
+        html = html.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+
+        // Headings
+        html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+        html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+        html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+        // Horizontal rules
+        html = html.replace(/^---+$/gm, '<hr>');
+
+        // Blockquotes
+        html = html.replace(/^&gt; (.+)$/gm, '<blockquote><p>$1</p></blockquote>');
+
+        // Bold and Italic
+        html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+        html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+        // Unordered lists
+        html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+        html = html.replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>');
+
+        // Paragraphs — wrap remaining loose lines
+        const lines = html.split('\n');
+        let result = '';
+        let inBlock = false;
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const trimmed = line.trim();
+
+            // Detect block-level elements
+            if (trimmed.startsWith('<h1') || trimmed.startsWith('<h2') || trimmed.startsWith('<h3') ||
+                trimmed.startsWith('<ul') || trimmed.startsWith('</ul') ||
+                trimmed.startsWith('<li') ||
+                trimmed.startsWith('<pre') || trimmed.startsWith('</pre') ||
+                trimmed.startsWith('<blockquote') || trimmed.startsWith('</blockquote') ||
+                trimmed.startsWith('<hr')) {
+                if (trimmed.startsWith('<pre')) inBlock = true;
+                if (trimmed.startsWith('</pre')) inBlock = false;
+                result += line + '\n';
+            } else if (inBlock) {
+                result += line + '\n';
+            } else if (trimmed === '') {
+                result += '\n';
+            } else {
+                result += '<p>' + trimmed + '</p>\n';
+            }
+        }
+
+        // Clean up consecutive blockquotes
+        result = result.replace(/<\/blockquote>\s*<blockquote>/g, '');
+
+        return result;
+    }
+
+    /* ══════════════════════════════════════════════
+       Toast System
+       ══════════════════════════════════════════════ */
+    function showToast(message, type) {
+        type = type || 'success';
+        var container = document.getElementById('toastContainer');
+        var toast = document.createElement('div');
+        toast.className = 'toast ' + type;
+
+        var iconSvg;
+        if (type === 'success') {
+            iconSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>';
+        } else if (type === 'error') {
+            iconSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
+        } else {
+            iconSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>';
+        }
+
+        toast.innerHTML =
+            '<span class="toast-icon">' + iconSvg + '</span>' +
+            '<span class="toast-message">' + escapeHtml(message) + '</span>' +
+            '<button class="toast-close" onclick="this.parentElement.remove()" aria-label="Dismiss">&times;</button>';
+
+        container.appendChild(toast);
+
+        requestAnimationFrame(function() {
+            requestAnimationFrame(function() { toast.classList.add('visible'); });
+        });
+
+        setTimeout(function() {
+            toast.classList.remove('visible');
+            setTimeout(function() { toast.remove(); }, 400);
+        }, 4500);
+    }
+
+    /* ══════════════════════════════════════════════
+       Data Loading
+       ══════════════════════════════════════════════ */
+    async function loadUser() {
+        try {
+            var data = await apiFetch('/api/auth/me');
+            currentUser = data.user;
+            document.getElementById('userName').textContent = currentUser.name || 'User';
+            document.getElementById('userEmail').textContent = currentUser.email || '';
+            document.getElementById('userAvatar').textContent = getInitials(currentUser.name || currentUser.email);
+        } catch (err) {
+            console.error('Failed to load user:', err);
+        }
+    }
+
+    async function loadDocuments() {
+        try {
+            var data = await apiFetch('/api/documents');
+            var docs = data.documents || data || [];
+
+            // Index by type
+            documents = {};
+            if (Array.isArray(docs)) {
+                docs.forEach(function(doc) {
+                    documents[doc.type] = doc;
+                });
+            }
+
+            renderDocGrid();
+        } catch (err) {
+            console.error('Failed to load documents:', err);
+            // Render grid with empty states anyway
+            documents = {};
+            renderDocGrid();
+        }
+    }
+
+    function renderDocGrid() {
+        var grid = document.getElementById('docGrid');
+        var types = Object.keys(DOC_TYPES);
+        var html = '';
+
+        types.forEach(function(type, i) {
+            var config = DOC_TYPES[type];
+            var doc = documents[type];
+            var hasContent = doc && doc.content && doc.content.trim();
+            var preview = hasContent ? doc.content.trim().substring(0, 150) : 'No content yet. Click to start writing.';
+            var lastUpdated = doc && doc.updated_at ? timeAgo(doc.updated_at) : null;
+            var bgDim = colorToBgDim(config.color);
+            var emptyClass = hasContent ? '' : ' empty';
+
+            html += '<div class="doc-card fade-up delay-' + Math.min(i + 1, 5) + emptyClass + '">' +
+                '<div class="top-accent" style="background:' + config.color + '"></div>' +
+                '<div class="doc-card-head">' +
+                    '<div class="doc-card-left">' +
+                        '<div class="doc-icon-wrap" style="background:' + bgDim + '">' + config.icon + '</div>' +
+                        '<div>' +
+                            '<h3>' + escapeHtml(config.title) + '</h3>' +
+                            '<div class="doc-card-type">' + type + '</div>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="doc-preview">' + escapeHtml(preview) + '</div>' +
+                '<div class="doc-card-footer">' +
+                    '<div class="doc-meta">' +
+                        (lastUpdated
+                            ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> ' + lastUpdated
+                            : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Not created') +
+                    '</div>' +
+                    (hasContent
+                        ? '<button class="btn btn-edit" onclick="openEditor(\'' + type + '\')">' +
+                            '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+                            ' Edit</button>'
+                        : '<button class="btn btn-create" onclick="openEditor(\'' + type + '\')">' +
+                            '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>' +
+                            ' Create</button>') +
+                '</div>' +
+            '</div>';
+        });
+
+        grid.innerHTML = html;
+    }
+
+    /* ══════════════════════════════════════════════
+       Editor
+       ══════════════════════════════════════════════ */
+    function openEditor(type) {
+        currentDocType = type;
+        var config = DOC_TYPES[type];
+        var doc = documents[type];
+        var content = (doc && doc.content) ? doc.content : '';
+
+        // Set editor UI
+        document.getElementById('editorIcon').textContent = config.icon;
+        document.getElementById('editorIcon').style.background = colorToBgDim(config.color);
+        document.getElementById('editorTitle').textContent = config.title;
+        document.getElementById('editorSubtitle').textContent = config.description;
+
+        var textarea = document.getElementById('editorTextarea');
+        textarea.value = content;
+        originalContent = content;
+        editorDirty = false;
+
+        updateCharCount();
+        updatePreview();
+        updateEditorStatus('ready');
+        document.getElementById('saveBtn').disabled = true;
+
+        // Show editor
+        var overlay = document.getElementById('editorOverlay');
+        overlay.classList.add('open');
+        requestAnimationFrame(function() {
+            requestAnimationFrame(function() {
+                overlay.classList.add('visible');
+            });
+        });
+
+        // Focus textarea
+        setTimeout(function() { textarea.focus(); }, 200);
+
+        // Prevent body scroll
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeEditor() {
+        if (editorDirty) {
+            var confirmed = confirm('You have unsaved changes. Are you sure you want to close?');
+            if (!confirmed) return;
+        }
+
+        var overlay = document.getElementById('editorOverlay');
+        overlay.classList.remove('visible');
+        setTimeout(function() {
+            overlay.classList.remove('open');
+        }, 300);
+
+        document.body.style.overflow = '';
+        currentDocType = null;
+        editorDirty = false;
+    }
+
+    function updateCharCount() {
+        var textarea = document.getElementById('editorTextarea');
+        var count = textarea.value.length;
+        document.getElementById('charCount').textContent = count.toLocaleString() + ' chars';
+    }
+
+    function updatePreview() {
+        var textarea = document.getElementById('editorTextarea');
+        var preview = document.getElementById('editorPreview');
+        var content = textarea.value.trim();
+
+        if (!content) {
+            preview.innerHTML = '<div class="md-preview-empty"><div class="icon">\u{1F4DD}</div><p>Start typing to see the preview</p></div>';
+        } else {
+            preview.innerHTML = '<div class="md-preview">' + renderMarkdown(content) + '</div>';
+        }
+    }
+
+    function updateEditorStatus(state) {
+        var status = document.getElementById('editorStatus');
+        status.className = 'editor-status';
+
+        if (state === 'unsaved') {
+            status.classList.add('unsaved');
+            status.querySelector('.label').textContent = 'Unsaved changes';
+        } else if (state === 'saving') {
+            status.classList.add('saving');
+            status.querySelector('.label').textContent = 'Saving...';
+        } else if (state === 'saved') {
+            status.classList.add('saved');
+            status.querySelector('.label').textContent = 'Saved';
+        } else {
+            status.querySelector('.label').textContent = 'Ready';
+        }
+    }
+
+    // Editor input handler
+    document.getElementById('editorTextarea').addEventListener('input', function() {
+        updateCharCount();
+        updatePreview();
+
+        var hasChanged = this.value !== originalContent;
+        editorDirty = hasChanged;
+        document.getElementById('saveBtn').disabled = !hasChanged;
+
+        if (hasChanged) {
+            updateEditorStatus('unsaved');
+        } else {
+            updateEditorStatus('ready');
+        }
+    });
+
+    // Tab key support in textarea
+    document.getElementById('editorTextarea').addEventListener('keydown', function(e) {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            var start = this.selectionStart;
+            var end = this.selectionEnd;
+            this.value = this.value.substring(0, start) + '    ' + this.value.substring(end);
+            this.selectionStart = this.selectionEnd = start + 4;
+            this.dispatchEvent(new Event('input'));
+        }
+        // Ctrl/Cmd+S to save
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            if (!document.getElementById('saveBtn').disabled) {
+                saveDocument();
+            }
+        }
+    });
+
+    async function saveDocument() {
+        if (!currentDocType) return;
+
+        var textarea = document.getElementById('editorTextarea');
+        var content = textarea.value;
+        var doc = documents[currentDocType];
+        var btn = document.getElementById('saveBtn');
+
+        btn.disabled = true;
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="animation:spin 1s linear infinite"><path d="M12 2a10 10 0 0110 10"/></svg> Saving...';
+        updateEditorStatus('saving');
+
+        try {
+            var result;
+            if (doc && doc.id) {
+                // Update existing
+                result = await apiFetch('/api/documents/' + currentDocType, {
+                    method: 'PUT',
+                    body: JSON.stringify({ content: content })
+                });
+            } else {
+                // Create new
+                result = await apiFetch('/api/documents', {
+                    method: 'POST',
+                    body: JSON.stringify({ type: currentDocType, content: content })
+                });
+            }
+
+            // Update local state
+            var updatedDoc = result.document || result;
+            documents[currentDocType] = {
+                id: updatedDoc.id || (doc && doc.id) || currentDocType,
+                type: currentDocType,
+                content: content,
+                updated_at: updatedDoc.updated_at || new Date().toISOString()
+            };
+
+            originalContent = content;
+            editorDirty = false;
+
+            updateEditorStatus('saved');
+            showToast(DOC_TYPES[currentDocType].title + ' saved successfully');
+
+            // Re-render the grid behind the editor
+            renderDocGrid();
+
+            // Reset save button
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save';
+            btn.disabled = true;
+
+            // Revert status after a moment
+            setTimeout(function() {
+                if (!editorDirty) updateEditorStatus('ready');
+            }, 2000);
+
+        } catch (err) {
+            console.error('Failed to save document:', err);
+            showToast(err.message || 'Failed to save document', 'error');
+            updateEditorStatus('unsaved');
+
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save';
+            btn.disabled = false;
+        }
+    }
+
+    // Close editor on Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && document.getElementById('editorOverlay').classList.contains('open')) {
+            closeEditor();
+        }
+    });
+
+    /* ══════════════════════════════════════════════
+       Logout
+       ══════════════════════════════════════════════ */
+    async function handleLogout(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        try {
+            await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
+        } catch (err) {
+            // even on error, redirect
+        }
+        window.location.href = '/login';
+    }
+
+    /* ══════════════════════════════════════════════
+       User Menu
+       ══════════════════════════════════════════════ */
+    function toggleUserMenu() {
+        var pill = document.getElementById('userPill');
+        var dropdown = document.getElementById('userDropdown');
+        var isOpen = dropdown.classList.contains('open');
+        if (isOpen) {
+            dropdown.classList.remove('open');
+            pill.classList.remove('open');
+        } else {
+            dropdown.classList.add('open');
+            pill.classList.add('open');
+        }
+    }
+
+    // close user menu when clicking outside
+    document.addEventListener('click', function(e) {
+        var pill = document.getElementById('userPill');
+        if (!pill.contains(e.target)) {
+            document.getElementById('userDropdown').classList.remove('open');
+            pill.classList.remove('open');
+        }
+    });
+
+    /* ══════════════════════════════════════════════
+       Mobile Sidebar
+       ══════════════════════════════════════════════ */
+    var mobileToggle = document.getElementById('mobileToggle');
+    var sidebar = document.getElementById('sidebar');
+    var backdrop = document.getElementById('sidebarBackdrop');
+
+    function toggleSidebar() {
+        var isOpen = sidebar.classList.contains('open');
+        if (isOpen) {
+            sidebar.classList.remove('open');
+            backdrop.classList.remove('visible');
+            mobileToggle.classList.remove('active');
+        } else {
+            sidebar.classList.add('open');
+            backdrop.classList.add('visible');
+            mobileToggle.classList.add('active');
+        }
+    }
+
+    mobileToggle.addEventListener('click', toggleSidebar);
+    backdrop.addEventListener('click', toggleSidebar);
+
+    /* ══════════════════════════════════════════════
+       Init
+       ══════════════════════════════════════════════ */
+    (async function init() {
+        await Promise.all([
+            loadUser(),
+            loadDocuments()
+        ]);
+    })();
+    </script>
+<script src="/sidebar.js"></script>
+</body>
+</html>

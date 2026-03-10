@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Runloop — Set Up Your Workspace</title>
+    <meta name="description" content="Configure your Runloop workspace. Tell us about your company, pick your agents, and start running autonomously.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{
+            --bg:#08090d;--surface:#0f1117;--surface-2:#151821;--border:#1a1d27;--border-light:#252838;
+            --text:#e8e9ed;--text-dim:#7a7f8e;--text-muted:#4a4f5e;
+            --accent:#00e599;--accent-dim:rgba(0,229,153,0.12);--accent-glow:rgba(0,229,153,0.25);
+            --engineering:#00e599;--research:#6366f1;--growth:#f59e0b;
+            --sales:#ef4444;--operations:#8b5cf6;--support:#06b6d4;
+        }
+        body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh;overflow-x:hidden}
+
+        /* Noise texture */
+        body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0}
+
+        /* Ambient glow */
+        .ambient{position:fixed;top:-200px;left:50%;transform:translateX(-50%);width:900px;height:900px;background:radial-gradient(circle,var(--accent-glow) 0%,transparent 70%);opacity:0.1;pointer-events:none;z-index:0;transition:opacity 0.8s}
+
+        /* Progress bar */
+        .progress-bar{position:fixed;top:0;left:0;height:3px;background:var(--accent);z-index:1000;transition:width 0.6s cubic-bezier(0.4,0,0.2,1);box-shadow:0 0 12px var(--accent-glow)}
+
+        /* Layout */
+        .onboarding-shell{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:40px 24px}
+
+        /* Logo */
+        .ob-logo{display:flex;align-items:center;gap:10px;margin-bottom:48px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:22px;letter-spacing:-0.5px}
+        .ob-logo .logo-mark{width:32px;height:32px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center}
+        .ob-logo .logo-mark svg{width:18px;height:18px}
+
+        /* Step indicator */
+        .step-indicator{display:flex;align-items:center;gap:12px;margin-bottom:48px}
+        .step-dot{width:10px;height:10px;border-radius:50%;background:var(--border-light);transition:all 0.4s cubic-bezier(0.4,0,0.2,1);position:relative}
+        .step-dot.active{background:var(--accent);box-shadow:0 0 12px var(--accent-glow)}
+        .step-dot.completed{background:var(--accent);opacity:0.5}
+        .step-connector{width:40px;height:2px;background:var(--border);transition:background 0.4s;border-radius:1px}
+        .step-connector.active{background:var(--accent);opacity:0.4}
+
+        /* Steps container */
+        .steps-viewport{width:100%;max-width:640px;overflow:hidden;position:relative}
+        .steps-track{display:flex;transition:transform 0.6s cubic-bezier(0.4,0,0.2,1);will-change:transform}
+        .step-panel{min-width:100%;padding:0 4px}
+
+        /* Card */
+        .ob-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:48px 44px;position:relative;overflow:hidden}
+        .ob-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent 10%,var(--border-light) 50%,transparent 90%)}
+
+        /* Typography */
+        .ob-title{font-family:'Space Grotesk',sans-serif;font-size:1.75rem;font-weight:700;letter-spacing:-0.5px;margin-bottom:8px}
+        .ob-subtitle{color:var(--text-dim);font-size:0.95rem;margin-bottom:36px;line-height:1.6}
+
+        /* Form elements */
+        .form-group{margin-bottom:24px}
+        .form-group:last-of-type{margin-bottom:0}
+        .form-label{display:block;font-size:13px;font-weight:600;color:var(--text-dim);margin-bottom:8px;letter-spacing:0.3px}
+        .form-input,
+        .form-textarea,
+        .form-select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 16px;font-family:'DM Sans',sans-serif;font-size:15px;color:var(--text);outline:none;transition:all 0.25s}
+        .form-input:focus,
+        .form-textarea:focus,
+        .form-select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+        .form-input::placeholder,
+        .form-textarea::placeholder{color:var(--text-muted)}
+        .form-textarea{resize:vertical;min-height:100px;line-height:1.6}
+        .form-select{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237a7f8e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center}
+        .form-select option{background:var(--surface);color:var(--text)}
+        .form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+
+        /* Buttons */
+        .ob-actions{display:flex;justify-content:space-between;align-items:center;margin-top:36px}
+        .btn-continue{padding:13px 32px;border-radius:10px;font-size:15px;font-weight:600;background:var(--accent);color:#08090d;border:none;cursor:pointer;transition:all 0.25s;font-family:'DM Sans',sans-serif;display:flex;align-items:center;gap:8px}
+        .btn-continue:hover{box-shadow:0 4px 24px var(--accent-glow);transform:translateY(-1px)}
+        .btn-continue:active{transform:translateY(0)}
+        .btn-continue:disabled{opacity:0.4;cursor:not-allowed;transform:none;box-shadow:none}
+        .btn-continue svg{width:16px;height:16px;transition:transform 0.2s}
+        .btn-continue:hover svg{transform:translateX(2px)}
+        .btn-back{padding:13px 24px;border-radius:10px;font-size:15px;font-weight:500;background:transparent;color:var(--text-dim);border:1px solid var(--border);cursor:pointer;transition:all 0.25s;font-family:'DM Sans',sans-serif}
+        .btn-back:hover{border-color:var(--border-light);color:var(--text)}
+        .btn-placeholder{width:90px}
+
+        /* Agent grid */
+        .agent-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:4px}
+        .agent-select-card{background:var(--bg);border:2px solid var(--border);border-radius:14px;padding:20px;cursor:pointer;transition:all 0.3s cubic-bezier(0.4,0,0.2,1);position:relative;overflow:hidden;user-select:none}
+        .agent-select-card:hover{border-color:var(--border-light);transform:translateY(-2px)}
+        .agent-select-card.selected{border-color:var(--agent-color,var(--accent));background:color-mix(in srgb, var(--agent-color,var(--accent)) 6%, var(--bg))}
+        .agent-select-card.selected::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--agent-color,var(--accent))}
+
+        .agent-select-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+        .agent-select-icon{font-size:24px;line-height:1}
+        .agent-checkbox{width:20px;height:20px;border-radius:6px;border:2px solid var(--border-light);display:flex;align-items:center;justify-content:center;transition:all 0.25s;flex-shrink:0}
+        .agent-select-card.selected .agent-checkbox{background:var(--agent-color,var(--accent));border-color:var(--agent-color,var(--accent))}
+        .agent-checkbox svg{width:12px;height:12px;opacity:0;transition:opacity 0.2s;stroke:#08090d;stroke-width:3}
+        .agent-select-card.selected .agent-checkbox svg{opacity:1}
+
+        .agent-select-name{font-family:'Space Grotesk',sans-serif;font-size:0.95rem;font-weight:600;margin-bottom:4px}
+        .agent-select-desc{font-size:0.8rem;color:var(--text-dim);line-height:1.5;margin-bottom:12px}
+        .agent-select-tools{display:flex;flex-wrap:wrap;gap:4px}
+        .agent-select-tools span{padding:2px 8px;font-size:10px;border-radius:5px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-muted);font-weight:500;letter-spacing:0.3px}
+        .agent-select-card.selected .agent-select-tools span{border-color:color-mix(in srgb, var(--agent-color,var(--accent)) 30%, var(--border));color:var(--text-dim)}
+
+        .agent-count{text-align:center;color:var(--text-dim);font-size:13px;margin-top:16px}
+        .agent-count strong{color:var(--accent);font-weight:600}
+
+        /* Success step */
+        .success-wrap{text-align:center;padding:20px 0}
+        .success-icon{width:88px;height:88px;border-radius:50%;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;margin:0 auto 32px;position:relative}
+        .success-icon::before{content:'';position:absolute;inset:-6px;border-radius:50%;border:2px solid var(--accent);opacity:0.2;animation:successRipple 2s ease-out infinite}
+        .success-icon::after{content:'';position:absolute;inset:-14px;border-radius:50%;border:1px solid var(--accent);opacity:0.1;animation:successRipple 2s ease-out 0.5s infinite}
+        @keyframes successRipple{0%{transform:scale(1);opacity:0.2}100%{transform:scale(1.4);opacity:0}}
+        .success-check{width:40px;height:40px;stroke:var(--accent);stroke-width:2.5;fill:none;stroke-linecap:round;stroke-linejoin:round}
+        .success-check .check-path{stroke-dasharray:60;stroke-dashoffset:60;animation:drawCheck 0.6s 0.3s ease forwards}
+        @keyframes drawCheck{to{stroke-dashoffset:0}}
+        .success-check .circle-path{stroke-dasharray:200;stroke-dashoffset:200;animation:drawCircle 0.5s ease forwards}
+        @keyframes drawCircle{to{stroke-dashoffset:0}}
+
+        .success-title{font-family:'Space Grotesk',sans-serif;font-size:2rem;font-weight:700;letter-spacing:-0.5px;margin-bottom:8px}
+        .success-subtitle{color:var(--text-dim);font-size:1rem;margin-bottom:40px;line-height:1.6}
+
+        .summary-box{background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:24px;text-align:left;margin-bottom:36px}
+        .summary-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
+        .summary-row:last-child{border-bottom:none}
+        .summary-label{font-size:13px;color:var(--text-dim);font-weight:500}
+        .summary-value{font-size:14px;font-weight:600;text-align:right;max-width:60%}
+        .summary-agents{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+        .summary-agent-pill{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:600;border:1px solid var(--border)}
+
+        .btn-dashboard{padding:15px 40px;border-radius:12px;font-size:16px;font-weight:700;background:var(--accent);color:#08090d;border:none;cursor:pointer;transition:all 0.25s;font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:10px}
+        .btn-dashboard:hover{box-shadow:0 6px 32px var(--accent-glow);transform:translateY(-2px)}
+        .btn-dashboard:active{transform:translateY(0)}
+        .btn-dashboard svg{width:18px;height:18px;transition:transform 0.2s}
+        .btn-dashboard:hover svg{transform:translateX(3px)}
+
+        /* Confetti */
+        .confetti-piece{position:fixed;width:8px;height:8px;border-radius:2px;z-index:2000;pointer-events:none;animation:confettiFall var(--duration,3s) var(--delay,0s) ease-out forwards}
+        @keyframes confettiFall{
+            0%{transform:translateY(0) rotate(0deg) scale(1);opacity:1}
+            80%{opacity:1}
+            100%{transform:translateY(100vh) rotate(var(--rotation,720deg)) scale(0.3);opacity:0}
+        }
+
+        /* Loading spinner */
+        .spinner{width:18px;height:18px;border:2px solid transparent;border-top-color:#08090d;border-radius:50%;animation:spin 0.6s linear infinite;display:none}
+        @keyframes spin{to{transform:rotate(360deg)}}
+
+        /* Validation */
+        .form-input.error,
+        .form-textarea.error,
+        .form-select.error{border-color:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,0.12)}
+        .field-error{font-size:12px;color:#ef4444;margin-top:6px;display:none}
+        .field-error.visible{display:block}
+
+        /* Responsive */
+        @media(max-width:640px){
+            .ob-card{padding:32px 24px}
+            .form-row{grid-template-columns:1fr}
+            .agent-grid{grid-template-columns:1fr}
+            .ob-title{font-size:1.4rem}
+            .steps-viewport{max-width:100%}
+            .step-connector{width:24px}
+            .onboarding-shell{padding:24px 16px}
+        }
+
+        /* Entrance animations */
+        @keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+        .fade-up{animation:fadeUp 0.5s ease both}
+        .delay-1{animation-delay:0.1s}
+        .delay-2{animation-delay:0.2s}
+        .delay-3{animation-delay:0.3s}
+
+        /* Particle canvas */
+        .particles{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0}
+    </style>
+</head>
+<body>
+    <div class="ambient" id="ambient"></div>
+    <div class="progress-bar" id="progressBar" style="width:33.3%"></div>
+    <canvas class="particles" id="particles"></canvas>
+
+    <div class="onboarding-shell">
+        <!-- Logo -->
+        <a href="/" class="ob-logo fade-up">
+            <div class="logo-mark">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#08090d" stroke-width="2.5" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            </div>
+            Runloop
+        </a>
+
+        <!-- Step indicator -->
+        <div class="step-indicator fade-up delay-1" id="stepIndicator">
+            <div class="step-dot active" data-step="0"></div>
+            <div class="step-connector" data-conn="0"></div>
+            <div class="step-dot" data-step="1"></div>
+            <div class="step-connector" data-conn="1"></div>
+            <div class="step-dot" data-step="2"></div>
+        </div>
+
+        <!-- Steps -->
+        <div class="steps-viewport fade-up delay-2">
+            <div class="steps-track" id="stepsTrack">
+
+                <!-- Step 1: Company Info -->
+                <div class="step-panel" id="step0">
+                    <div class="ob-card">
+                        <h2 class="ob-title">Tell us about your company</h2>
+                        <p class="ob-subtitle">We use this to customize your agents and configure the right workflows for your business.</p>
+
+                        <div class="form-group">
+                            <label class="form-label" for="companyName">Company name</label>
+                            <input type="text" class="form-input" id="companyName" placeholder="e.g. Acme Corp" autocomplete="organization" autofocus>
+                            <div class="field-error" id="companyNameError">Please enter your company name</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="companyDesc">What does your company do?</label>
+                            <textarea class="form-textarea" id="companyDesc" placeholder="Describe your business in a few sentences. The more detail you give, the better your agents will perform."></textarea>
+                            <div class="field-error" id="companyDescError">A short description helps us configure your agents</div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label" for="industry">Industry</label>
+                                <select class="form-select" id="industry">
+                                    <option value="" disabled selected>Select industry</option>
+                                    <option value="technology">Technology</option>
+                                    <option value="healthcare">Healthcare</option>
+                                    <option value="finance">Finance</option>
+                                    <option value="ecommerce">E-commerce</option>
+                                    <option value="education">Education</option>
+                                    <option value="marketing">Marketing</option>
+                                    <option value="other">Other</option>
+                                </select>
+                                <div class="field-error" id="industryError">Please select an industry</div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="companySize">Company size</label>
+                                <select class="form-select" id="companySize">
+                                    <option value="" disabled selected>Select size</option>
+                                    <option value="1">Just me</option>
+                                    <option value="2-5">2-5</option>
+                                    <option value="6-20">6-20</option>
+                                    <option value="21-50">21-50</option>
+                                    <option value="50+">50+</option>
+                                </select>
+                                <div class="field-error" id="companySizeError">Please select your company size</div>
+                            </div>
+                        </div>
+
+                        <div class="ob-actions">
+                            <div class="btn-placeholder"></div>
+                            <button class="btn-continue" id="btnStep1" onclick="goToStep(1)">
+                                Continue
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2: Pick Agents -->
+                <div class="step-panel" id="step1">
+                    <div class="ob-card">
+                        <h2 class="ob-title">Pick your agents</h2>
+                        <p class="ob-subtitle">Select the autonomous agents you want active in your workspace. You can change this anytime.</p>
+
+                        <div class="agent-grid" id="agentGrid">
+                            <div class="agent-select-card selected" data-agent="engineering" style="--agent-color:var(--engineering)" onclick="toggleAgent(this)">
+                                <div class="agent-select-header">
+                                    <span class="agent-select-icon">&#9889;</span>
+                                    <div class="agent-checkbox">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+                                    </div>
+                                </div>
+                                <div class="agent-select-name">Engineering</div>
+                                <div class="agent-select-desc">Writes code, fixes bugs, deploys to production</div>
+                                <div class="agent-select-tools"><span>code_execute</span><span>git_ops</span><span>terminal</span></div>
+                            </div>
+
+                            <div class="agent-select-card selected" data-agent="research" style="--agent-color:var(--research)" onclick="toggleAgent(this)">
+                                <div class="agent-select-header">
+                                    <span class="agent-select-icon">&#128269;</span>
+                                    <div class="agent-checkbox">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+                                    </div>
+                                </div>
+                                <div class="agent-select-name">Research</div>
+                                <div class="agent-select-desc">Competitive analysis, market research, reports</div>
+                                <div class="agent-select-tools"><span>web_search</span><span>summarize</span><span>report</span></div>
+                            </div>
+
+                            <div class="agent-select-card selected" data-agent="growth" style="--agent-color:var(--growth)" onclick="toggleAgent(this)">
+                                <div class="agent-select-header">
+                                    <span class="agent-select-icon">&#128200;</span>
+                                    <div class="agent-checkbox">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+                                    </div>
+                                </div>
+                                <div class="agent-select-name">Growth</div>
+                                <div class="agent-select-desc">Content, social campaigns, email sequences</div>
+                                <div class="agent-select-tools"><span>content_gen</span><span>social</span><span>email</span></div>
+                            </div>
+
+                            <div class="agent-select-card selected" data-agent="sales" style="--agent-color:var(--sales)" onclick="toggleAgent(this)">
+                                <div class="agent-select-header">
+                                    <span class="agent-select-icon">&#127919;</span>
+                                    <div class="agent-checkbox">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+                                    </div>
+                                </div>
+                                <div class="agent-select-name">Sales</div>
+                                <div class="agent-select-desc">Finds leads, outreach, pipeline management</div>
+                                <div class="agent-select-tools"><span>lead_search</span><span>outreach</span><span>crm</span></div>
+                            </div>
+
+                            <div class="agent-select-card selected" data-agent="operations" style="--agent-color:var(--operations)" onclick="toggleAgent(this)">
+                                <div class="agent-select-header">
+                                    <span class="agent-select-icon">&#128295;</span>
+                                    <div class="agent-checkbox">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+                                    </div>
+                                </div>
+                                <div class="agent-select-name">Operations</div>
+                                <div class="agent-select-desc">Monitors services, schedules, infrastructure</div>
+                                <div class="agent-select-tools"><span>monitor</span><span>schedule</span><span>alerts</span></div>
+                            </div>
+
+                            <div class="agent-select-card selected" data-agent="support" style="--agent-color:var(--support)" onclick="toggleAgent(this)">
+                                <div class="agent-select-header">
+                                    <span class="agent-select-icon">&#128172;</span>
+                                    <div class="agent-checkbox">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+                                    </div>
+                                </div>
+                                <div class="agent-select-name">Support</div>
+                                <div class="agent-select-desc">Tickets, knowledge base, sentiment analysis</div>
+                                <div class="agent-select-tools"><span>tickets</span><span>kb_search</span><span>escalate</span></div>
+                            </div>
+                        </div>
+
+                        <div class="agent-count" id="agentCount"><strong>6</strong> agents selected</div>
+
+                        <div class="ob-actions">
+                            <button class="btn-back" onclick="goToStep(0)">Back</button>
+                            <button class="btn-continue" id="btnStep2" onclick="goToStep(2)">
+                                Continue
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3: Success -->
+                <div class="step-panel" id="step2">
+                    <div class="ob-card">
+                        <div class="success-wrap">
+                            <div class="success-icon">
+                                <svg class="success-check" viewBox="0 0 52 52">
+                                    <circle class="circle-path" cx="26" cy="26" r="24"/>
+                                    <path class="check-path" d="M15 27l7 7 15-15"/>
+                                </svg>
+                            </div>
+
+                            <h2 class="success-title">You're all set!</h2>
+                            <p class="success-subtitle">Your workspace is configured and your agents are ready to start working.</p>
+
+                            <div class="summary-box" id="summaryBox">
+                                <div class="summary-row">
+                                    <span class="summary-label">Company</span>
+                                    <span class="summary-value" id="summaryCompany">-</span>
+                                </div>
+                                <div class="summary-row">
+                                    <span class="summary-label">Industry</span>
+                                    <span class="summary-value" id="summaryIndustry">-</span>
+                                </div>
+                                <div class="summary-row">
+                                    <span class="summary-label">Team size</span>
+                                    <span class="summary-value" id="summarySize">-</span>
+                                </div>
+                                <div class="summary-row">
+                                    <span class="summary-label">Active agents</span>
+                                    <span class="summary-value" id="summaryAgents"></span>
+                                </div>
+                            </div>
+
+                            <button class="btn-dashboard" id="btnDashboard" onclick="window.location.href='/chat'">
+                                Start Chatting
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // =========================================================================
+    // State
+    // =========================================================================
+    let currentStep = 0;
+    const totalSteps = 3;
+
+    const agentMeta = {
+        engineering: { icon: '\u26A1', label: 'Engineering', color: '#00e599' },
+        research:    { icon: '\uD83D\uDD0D', label: 'Research', color: '#6366f1' },
+        growth:      { icon: '\uD83D\uDCC8', label: 'Growth', color: '#f59e0b' },
+        sales:       { icon: '\uD83C\uDFAF', label: 'Sales', color: '#ef4444' },
+        operations:  { icon: '\uD83D\uDD27', label: 'Operations', color: '#8b5cf6' },
+        support:     { icon: '\uD83D\uDCAC', label: 'Support', color: '#06b6d4' }
+    };
+
+    // =========================================================================
+    // Navigation
+    // =========================================================================
+    function goToStep(step) {
+        // Validate before proceeding forward
+        if (step > currentStep) {
+            if (currentStep === 0 && !validateStep1()) return;
+            if (currentStep === 1 && !validateStep2()) return;
+        }
+
+        currentStep = step;
+        const track = document.getElementById('stepsTrack');
+        track.style.transform = 'translateX(-' + (currentStep * 100) + '%)';
+
+        // Update progress bar
+        document.getElementById('progressBar').style.width = ((currentStep + 1) / totalSteps * 100) + '%';
+
+        // Update step dots
+        document.querySelectorAll('.step-dot').forEach(function(dot, i) {
+            dot.classList.remove('active', 'completed');
+            if (i === currentStep) dot.classList.add('active');
+            else if (i < currentStep) dot.classList.add('completed');
+        });
+        document.querySelectorAll('.step-connector').forEach(function(conn, i) {
+            conn.classList.toggle('active', i < currentStep);
+        });
+
+        // If reaching the final step, submit data and populate summary
+        if (currentStep === 2) {
+            populateSummary();
+            submitOnboarding();
+            launchConfetti();
+        }
+    }
+
+    // =========================================================================
+    // Validation
+    // =========================================================================
+    function validateStep1() {
+        let valid = true;
+        const name = document.getElementById('companyName');
+        const desc = document.getElementById('companyDesc');
+        const industry = document.getElementById('industry');
+        const size = document.getElementById('companySize');
+
+        // Company name
+        if (!name.value.trim()) {
+            name.classList.add('error');
+            document.getElementById('companyNameError').classList.add('visible');
+            valid = false;
+        } else {
+            name.classList.remove('error');
+            document.getElementById('companyNameError').classList.remove('visible');
+        }
+
+        // Description
+        if (!desc.value.trim()) {
+            desc.classList.add('error');
+            document.getElementById('companyDescError').classList.add('visible');
+            valid = false;
+        } else {
+            desc.classList.remove('error');
+            document.getElementById('companyDescError').classList.remove('visible');
+        }
+
+        // Industry
+        if (!industry.value) {
+            industry.classList.add('error');
+            document.getElementById('industryError').classList.add('visible');
+            valid = false;
+        } else {
+            industry.classList.remove('error');
+            document.getElementById('industryError').classList.remove('visible');
+        }
+
+        // Size
+        if (!size.value) {
+            size.classList.add('error');
+            document.getElementById('companySizeError').classList.add('visible');
+            valid = false;
+        } else {
+            size.classList.remove('error');
+            document.getElementById('companySizeError').classList.remove('visible');
+        }
+
+        // Shake the card on error
+        if (!valid) {
+            var card = document.querySelector('#step0 .ob-card');
+            card.style.animation = 'none';
+            card.offsetHeight; // trigger reflow
+            card.style.animation = 'shake 0.4s ease';
+        }
+
+        return valid;
+    }
+
+    function validateStep2() {
+        var selected = document.querySelectorAll('.agent-select-card.selected');
+        if (selected.length === 0) {
+            var countEl = document.getElementById('agentCount');
+            countEl.innerHTML = '<span style="color:#ef4444">Please select at least one agent</span>';
+            return false;
+        }
+        return true;
+    }
+
+    // Clear errors on input
+    document.querySelectorAll('.form-input, .form-textarea, .form-select').forEach(function(el) {
+        el.addEventListener('input', function() {
+            this.classList.remove('error');
+            var errorEl = this.parentElement.querySelector('.field-error');
+            if (errorEl) errorEl.classList.remove('visible');
+        });
+        el.addEventListener('change', function() {
+            this.classList.remove('error');
+            var errorEl = this.parentElement.querySelector('.field-error');
+            if (errorEl) errorEl.classList.remove('visible');
+        });
+    });
+
+    // =========================================================================
+    // Agent toggle
+    // =========================================================================
+    function toggleAgent(card) {
+        card.classList.toggle('selected');
+        updateAgentCount();
+    }
+
+    function updateAgentCount() {
+        var count = document.querySelectorAll('.agent-select-card.selected').length;
+        var countEl = document.getElementById('agentCount');
+        if (count === 0) {
+            countEl.innerHTML = '<span style="color:#ef4444">Select at least one agent</span>';
+        } else {
+            countEl.innerHTML = '<strong>' + count + '</strong> agent' + (count !== 1 ? 's' : '') + ' selected';
+        }
+    }
+
+    // =========================================================================
+    // Summary
+    // =========================================================================
+    function populateSummary() {
+        document.getElementById('summaryCompany').textContent = document.getElementById('companyName').value.trim();
+
+        var industrySelect = document.getElementById('industry');
+        var industryText = industrySelect.options[industrySelect.selectedIndex].text;
+        document.getElementById('summaryIndustry').textContent = industryText;
+
+        var sizeSelect = document.getElementById('companySize');
+        var sizeText = sizeSelect.options[sizeSelect.selectedIndex].text;
+        document.getElementById('summarySize').textContent = sizeText;
+
+        // Agent pills
+        var agentsHtml = '<div class="summary-agents">';
+        document.querySelectorAll('.agent-select-card.selected').forEach(function(card) {
+            var key = card.getAttribute('data-agent');
+            var meta = agentMeta[key];
+            agentsHtml += '<span class="summary-agent-pill" style="border-color:' + meta.color + '30;background:' + meta.color + '10;color:' + meta.color + '">' + meta.icon + ' ' + meta.label + '</span>';
+        });
+        agentsHtml += '</div>';
+        document.getElementById('summaryAgents').innerHTML = agentsHtml;
+    }
+
+    // =========================================================================
+    // Submit
+    // =========================================================================
+    function submitOnboarding() {
+        var selectedAgents = [];
+        document.querySelectorAll('.agent-select-card.selected').forEach(function(card) {
+            selectedAgents.push(card.getAttribute('data-agent'));
+        });
+
+        // Show loading state
+        var dashBtn = document.getElementById('btnDashboard');
+        dashBtn.textContent = 'Setting up your workspace...';
+        dashBtn.disabled = true;
+        dashBtn.style.opacity = '0.6';
+
+        var successTitle = document.querySelector('.success-title');
+        if (successTitle) successTitle.textContent = 'Setting up your workspace...';
+        var successSub = document.querySelector('.success-subtitle');
+        if (successSub) successSub.textContent = 'Our AI is generating your documents, tasks, and configuring your agents. This may take a moment.';
+
+        // First save company info
+        var companyPayload = {
+            companyName: document.getElementById('companyName').value.trim(),
+            companyDescription: document.getElementById('companyDesc').value.trim(),
+            industry: document.getElementById('industry').value,
+            size: document.getElementById('companySize').value,
+            selectedAgents: selectedAgents
+        };
+
+        fetch('/api/onboarding', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(companyPayload)
+        }).then(function() {
+            // Then complete onboarding (generates docs, starter tasks, welcome message)
+            return fetch('/api/onboarding/complete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    selectedAgents: selectedAgents,
+                    communicationStyle: 'professional'
+                })
+            });
+        }).then(function(res) {
+            if (successTitle) successTitle.textContent = "You're all set!";
+            if (successSub) successSub.textContent = 'Your workspace is configured and your agents are ready to start working.';
+            dashBtn.innerHTML = 'Start Chatting <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>';
+            dashBtn.disabled = false;
+            dashBtn.style.opacity = '1';
+        }).catch(function(err) {
+            console.error('Onboarding submission error:', err);
+            if (successTitle) successTitle.textContent = "You're all set!";
+            if (successSub) successSub.textContent = 'Workspace created. Some background tasks may still be processing.';
+            dashBtn.innerHTML = 'Start Chatting <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>';
+            dashBtn.disabled = false;
+            dashBtn.style.opacity = '1';
+        });
+    }
+
+    // Skip onboarding for returning users
+    fetch('/api/onboarding/status')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.completed || data.hasDocuments) {
+                window.location.href = '/chat';
+            }
+        })
+        .catch(function() {});
+
+    // =========================================================================
+    // Confetti
+    // =========================================================================
+    function launchConfetti() {
+        var colors = ['#00e599', '#6366f1', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#e8e9ed'];
+        for (var i = 0; i < 60; i++) {
+            var piece = document.createElement('div');
+            piece.className = 'confetti-piece';
+            piece.style.left = Math.random() * 100 + 'vw';
+            piece.style.top = '-10px';
+            piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+            piece.style.setProperty('--duration', (2 + Math.random() * 2) + 's');
+            piece.style.setProperty('--delay', (Math.random() * 0.6) + 's');
+            piece.style.setProperty('--rotation', (360 + Math.random() * 720) + 'deg');
+            piece.style.width = (5 + Math.random() * 7) + 'px';
+            piece.style.height = (5 + Math.random() * 7) + 'px';
+            piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+            document.body.appendChild(piece);
+            // Remove after animation
+            (function(el) {
+                setTimeout(function() { el.remove(); }, 5000);
+            })(piece);
+        }
+    }
+
+    // =========================================================================
+    // Shake animation (for validation)
+    // =========================================================================
+    var shakeStyle = document.createElement('style');
+    shakeStyle.textContent = '@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}';
+    document.head.appendChild(shakeStyle);
+
+    // =========================================================================
+    // Particle background
+    // =========================================================================
+    (function() {
+        var canvas = document.getElementById('particles');
+        var ctx = canvas.getContext('2d');
+        var particles = [];
+        var particleCount = 40;
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        for (var i = 0; i < particleCount; i++) {
+            particles.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                vx: (Math.random() - 0.5) * 0.3,
+                vy: (Math.random() - 0.5) * 0.3,
+                size: Math.random() * 1.5 + 0.5,
+                opacity: Math.random() * 0.15 + 0.03
+            });
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (var i = 0; i < particles.length; i++) {
+                var p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+
+                if (p.x < 0) p.x = canvas.width;
+                if (p.x > canvas.width) p.x = 0;
+                if (p.y < 0) p.y = canvas.height;
+                if (p.y > canvas.height) p.y = 0;
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(0,229,153,' + p.opacity + ')';
+                ctx.fill();
+            }
+
+            // Draw faint connections
+            for (var i = 0; i < particles.length; i++) {
+                for (var j = i + 1; j < particles.length; j++) {
+                    var dx = particles[i].x - particles[j].x;
+                    var dy = particles[i].y - particles[j].y;
+                    var dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < 150) {
+                        ctx.beginPath();
+                        ctx.moveTo(particles[i].x, particles[i].y);
+                        ctx.lineTo(particles[j].x, particles[j].y);
+                        ctx.strokeStyle = 'rgba(0,229,153,' + (0.03 * (1 - dist / 150)) + ')';
+                        ctx.lineWidth = 0.5;
+                        ctx.stroke();
+                    }
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+        animate();
+    })();
+
+    // =========================================================================
+    // Keyboard navigation
+    // =========================================================================
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && currentStep < 2) {
+            // Don't trigger if focus is in textarea
+            if (document.activeElement.tagName === 'TEXTAREA') return;
+            goToStep(currentStep + 1);
+        }
+    });
+
+    // =========================================================================
+    // Polsia Analytics
+    // =========================================================================
+    (function() {
+        var slug = 'runloop';
+        if (!slug || slug === '__POLSIA_' + 'SLUG__') return;
+        var vid = localStorage.getItem('polsia_vid');
+        if (!vid) {
+            vid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                var r = Math.random() * 16 | 0;
+                return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+            });
+            localStorage.setItem('polsia_vid', vid);
+        }
+        new Image().src = 'https://polsia.com/api/beacon/pixel?s=' + encodeURIComponent(slug) + '&v=' + encodeURIComponent(vid);
+    })();
+    </script>
+</body>
+</html>
